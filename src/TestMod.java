@@ -1,5 +1,3 @@
-// ModInfo+ Enhanced v1.0 - Part 1: Core Architecture (Data-Driven)
-
 import arc.*;
 import arc.func.*;
 import arc.graphics.*;
@@ -45,7 +43,7 @@ public class TestMod extends Mod {
     private TextureRegion jsBadge;
 
     public TestMod() {
-        Log.info("ModInfo+ Enhanced: Initializing with data-driven architecture...");
+        Log.info("ModInfo+ Enhanced: Initializing");
     }
 
     @Override
@@ -63,7 +61,6 @@ public class TestMod extends Mod {
     void loadStyles() {
         modCardBg = Tex.button;
         headerBg = Tex.underline;
-        Log.info("Styles loaded");
     }
     
     void loadBadges() {
@@ -75,7 +72,6 @@ public class TestMod extends Mod {
                 TextureRegion region = Core.atlas.find(name);
                 if (region != errorRegion && region.texture != null) {
                     javaBadge = region;
-                    Log.info("Java badge loaded: " + name);
                     break;
                 }
             }
@@ -85,16 +81,11 @@ public class TestMod extends Mod {
                 TextureRegion region = Core.atlas.find(name);
                 if (region != errorRegion && region.texture != null) {
                     jsBadge = region;
-                    Log.info("JS badge loaded: " + name);
                     break;
                 }
             }
-            
-            if (javaBadge == null) Log.warn("Java badge not found - using fallback");
-            if (jsBadge == null) Log.warn("JS badge not found - using fallback");
-            
         } catch (Exception e) {
-            Log.err("Failed to load badges", e);
+            Log.err("Badge load failed", e);
         }
     }
     
@@ -111,10 +102,8 @@ public class TestMod extends Mod {
                 
             }).growX().pad(10f);
             
-            Log.info("Enhanced section added to mod menu!");
-            
         } catch (Exception e) {
-            Log.err("Failed to enhance mod menu", e);
+            Log.err("Menu enhance failed", e);
         }
     }
     
@@ -269,18 +258,12 @@ public class TestMod extends Mod {
                             TextureRegion region = new TextureRegion(texture);
                             
                             iconCache.put(mod.repo, region);
-                            
                             updateVisibleMods();
-                            
                             pixmap.dispose();
-                        } catch (Exception e) {
-                            Log.err("Icon load failed: " + mod.name);
-                        }
+                        } catch (Exception e) {}
                     });
                 }
-            } catch (Exception e) {
-                Log.err("Icon fetch failed: " + mod.name);
-            }
+            } catch (Exception e) {}
         });
     }
     
@@ -313,7 +296,6 @@ public class TestMod extends Mod {
                 });
                 
             } catch (Exception ex) {
-                Log.err("Failed to fetch mod list", ex);
                 Core.app.post(() -> updateStatusLabel("[scarlet]Failed to load mods"));
             }
         });
@@ -343,9 +325,7 @@ public class TestMod extends Mod {
                 }
             }
             
-        } catch (Exception e) {
-            Log.err("JSON parsing failed", e);
-        }
+        } catch (Exception e) {}
         
         return mods;
     }
@@ -369,9 +349,7 @@ public class TestMod extends Mod {
         } catch (Exception e) {
             return dateStr;
         }
-    }ModInfo+ Enhanced v1.0 - Part 2: UI Building & Stats (Data-Driven)
-
-    void buildModRow(Table table, ModInfo mod) {
+    }void buildModRow(Table table, ModInfo mod) {
         table.table(modCardBg, row -> {
             row.left();
             row.margin(6f);
@@ -401,7 +379,7 @@ public class TestMod extends Mod {
                     if (mod.modType != null) {
                         if (mod.modType.equals("java")) {
                             if (javaBadge != null) {
-                                Image badge = new Image(javaBadge);
+                                Image badge = new Image(new TextureRegionDrawable(javaBadge));
                                 badge.setScaling(Scaling.fit);
                                 titleRow.add(badge).size(24f, 14f);
                             } else {
@@ -409,7 +387,7 @@ public class TestMod extends Mod {
                             }
                         } else {
                             if (jsBadge != null) {
-                                Image badge = new Image(jsBadge);
+                                Image badge = new Image(new TextureRegionDrawable(jsBadge));
                                 badge.setScaling(Scaling.fit);
                                 titleRow.add(badge).size(24f, 14f);
                             } else {
@@ -605,15 +583,11 @@ public class TestMod extends Mod {
                     }
                     stats.downloads = totalDownloads;
                     
-                } catch (Exception e) {
-                    Log.err("Stats parsing failed", e);
-                }
+                } catch (Exception e) {}
 
                 Core.app.post(() -> callback.get(stats));
 
-            } catch (Exception e) {
-                Log.err("Failed to fetch stats for: " + mod.name, e);
-            }
+            } catch (Exception e) {}
         });
     }
     
