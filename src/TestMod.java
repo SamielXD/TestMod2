@@ -1,6 +1,9 @@
+// Part 1 of 2 - Copy this first part into TestMod.java
+
 import arc.*;
 import arc.func.*;
 import arc.graphics.*;
+import arc.graphics.g2d.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
@@ -16,44 +19,131 @@ import java.io.*;
 
 public class TestMod extends Mod {
     
+    private Seq<ModInfo> allMods = new Seq<>();
+    
     public TestMod() {
         Events.on(ClientLoadEvent.class, e -> {
             Vars.ui.menufrag.addButton("ModInfo", Icon.info, () -> {
-                showStatsDialog();
+                showModBrowser();
             });
         });
     }
     
-    void showStatsDialog() {
-        BaseDialog dialog = new BaseDialog("ModInfo v1.0");
+    void showModBrowser() {
+        BaseDialog dialog = new BaseDialog("Mindustry Mod Browser");
+        dialog.addCloseButton();
         
-        dialog.cont.add("[accent]Fetching mod stats...").row();
+        Table cont = new Table();
+        ScrollPane pane = new ScrollPane(cont);
+        pane.setFadeScrollBars(false);
         
-        dialog.buttons.button("Close", dialog::hide).size(120, 50);
+        dialog.cont.add("[accent]Loading mods from GitHub...").row();
+        dialog.cont.add(pane).grow().row();
         dialog.show();
         
-        fetchStats("SamielXD", "UnitNamerMod", stats -> {
+        // Fetch mod list from MindustryMods repository
+        fetchModList(mods -> {
             dialog.cont.clear();
             
-            if (stats != null) {
-                dialog.cont.add("[cyan]Unit Namer Mod").row();
-                dialog.cont.add("").height(20).row();
-                dialog.cont.add("[white]Downloads: [lime]" + stats.downloads).row();
-                dialog.cont.add("[white]Releases: [accent]" + stats.releases).row();
-                dialog.cont.add("[white]Stars: [yellow]" + stats.stars).row();
-            } else {
-                dialog.cont.add("[scarlet]Failed to load stats").row();
+            if (mods == null || mods.size == 0) {
+                dialog.cont.add("[scarlet]Failed to load mods").row();
+                dialog.cont.add(pane).grow().row();
+                return;
+            }
+            
+            allMods = mods;
+            dialog.cont.add("[accent]Found " + mods.size + " mods").padBottom(10).row();
+            dialog.cont.add(pane).grow().row();
+            
+            cont.clear();
+            cont.margin(10f);
+            
+            for (ModInfo mod : mods) {
+                buildModEntry(cont, mod);
             }
         });
     }
     
-    void fetchStats(String owner, String repo, Cons<ModStats> callback) {
+    void buildModEntry(Table table, ModInfo mod) {
+        table.table(Tex.button, t -> {
+            t.margin(10f);
+            
+            // Left side - Icon
+            Table iconTable = new Table();
+            iconTable.image().size(48f).update(img -> {
+                if (mod.iconTexture != null) {
+                    img.setDrawable(new TextureRegionDrawable(mod.iconTexture));
+                } else if (!mod.iconLoading) {
+                    img.setDrawable(Icon.modSmall);
+                }
+            }).pad(4f);
+            
+            t.add(iconTable).size(56f).padRight(10f);
+            
+            // Middle - Info
+            Table info = new Table();
+            info.left();
+            info.add("[accent]" + mod.name).left().row();
+            info.add("[lightgray]" + mod.author).left().fontSize(0.8f).row();
+            info.add("[gray]" + mod.description).left().width(300f).wrap().fontSize(0.75f).row();
+            info.add("[white]Stars: [yellow]" + mod.stars + " [white]Version: [cyan]" + mod.version).left().fontSize(0.75f).row();
+            
+            t.add(info).growX().padRight(10f);
+            
+            // Right side - Buttons
+            Table buttons = new Table();
+            buttons.defaults().size(120f, 40f).pad(2f);
+            
+            buttons.button("View Stats", Icon.info, () -> {
+                showModStats(mod);
+            }).row();
+            
+            buttons.button("GitHub", Icon.link, () -> {
+                if (!Core.app.openURI(mod.repo)) {
+                    Vars.ui.showErrorMessage("Could not open link!");
+                }
+            }).row();
+            
+            t.add(buttons).right();
+            
+        }).growX().pad(5f).row();
+        
+        // Load icon asynchronously
+        if (mod.iconTexture == null && !mod.iconLoading) {
+            mod.iconLoading = true;
+            loadModIcon(mod);
+        }
+    }
+    
+    void showModStats(ModInfo mod) {
+        BaseDialog statsDialog = new BaseDialog("Mod Statistics");
+        
+        statsDialog.cont.add("[cyan]" + mod.name).row();
+        statsDialog.cont.add("").height(20).row();
+        statsDialog.cont.add("[white]Author: [accent]" + mod.author).row();
+        statsDialog.cont.add("[white]Repository: [accent]" + mod.repo).row();
+        statsDialog.cont.add("[white]Stars: [yellow]" + mod.stars).row();
+        statsDialog.cont.add("[white]Version: [cyan]" + mod.version).row();
+        statsDialog.cont.add("[white]Last Updated: [lightgray]" + mod.lastUpdated).row();
+        
+        if (mod.description != null && !mod.description.isEmpty()) {
+            statsDialog.cont.add("").height(10).row();
+            statsDialog.cont.add("[lightgray]" + mod.description).width(400f).wrap().row();
+        }
+        
+        statsDialog.buttons.button("Close", statsDialog::hide).size(120, 50);
+        statsDialog.show();
+    }
+    
+    void fetchModList(Cons<Seq<ModInfo>> callback) {
         Core.app.post(() -> {
             try {
-                String url = "https://api.github.com/repos/" + owner + "/" + repo + "/releases";
+                String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "ModInfo");
+                conn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
                 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder response = new StringBuilder();
@@ -63,85 +153,141 @@ public class TestMod extends Mod {
                 }
                 reader.close();
                 
-                String data = response.toString();
-                int releases = countOccurrences(data, "\"tag_name\"");
-                int downloads = countDownloads(data);
-                
-                String repoUrl = "https://api.github.com/repos/" + owner + "/" + repo;
-                HttpURLConnection repoConn = (HttpURLConnection) new URL(repoUrl).openConnection();
-                repoConn.setRequestMethod("GET");
-                repoConn.setRequestProperty("User-Agent", "ModInfo");
-                
-                BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
-                StringBuilder repoResponse = new StringBuilder();
-                while ((line = repoReader.readLine()) != null) {
-                    repoResponse.append(line);
-                }
-                repoReader.close();
-                
-                int stars = parseStars(repoResponse.toString());
-                
-                ModStats stats = new ModStats();
-                stats.downloads = downloads;
-                stats.releases = releases;
-                stats.stars = stars;
-                
-                Core.app.post(() -> callback.get(stats));
+                Seq<ModInfo> mods = parseModList(response.toString());
+                Core.app.post(() -> callback.get(mods));
                 
             } catch (Exception ex) {
+                Log.err("Failed to fetch mod list", ex);
                 Core.app.post(() -> callback.get(null));
             }
         });
     }
     
-    int countOccurrences(String str, String find) {
-        int count = 0;
-        int index = 0;
-        while ((index = str.indexOf(find, index)) != -1) {
-            count++;
-            index += find.length();
-        }
-        return count;
-    }
-    
-    int countDownloads(String data) {
-        int total = 0;
-        String search = "\"download_count\":";
-        int index = 0;
-        
-        while ((index = data.indexOf(search, index)) != -1) {
-            index += search.length();
-            int end = data.indexOf(",", index);
-            if (end == -1) end = data.indexOf("}", index);
-            
-            try {
-                String numStr = data.substring(index, end).trim();
-                total += Integer.parseInt(numStr);
-            } catch (Exception e) {}
-        }
-        
-        return total;
-    }
-    
-    int parseStars(String data) {
-        String search = "\"stargazers_count\":";
-        int index = data.indexOf(search);
-        if (index == -1) return 0;
-        
-        index += search.length();
-        int end = data.indexOf(",", index);
-        if (end == -1) end = data.indexOf("}", index);
+    Seq<ModInfo> parseModList(String json) {
+        Seq<ModInfo> mods = new Seq<>();
         
         try {
-            return Integer.parseInt(data.substring(index, end).trim());
+            // Remove opening bracket
+            json = json.trim();
+            if (json.startsWith("[")) json = json.substring(1);
+            if (json.endsWith("]")) json = json.substring(0, json.length() - 1);
+            
+            // Split by mod objects
+            String[] modObjects = json.split("\\},\\s*\\{");
+            
+            for (String modStr : modObjects) {
+                modStr = modStr.trim();
+                if (!modStr.startsWith("{")) modStr = "{" + modStr;
+                if (!modStr.endsWith("}")) modStr = modStr + "}";
+                
+                ModInfo mod = new ModInfo();
+                
+                mod.repo = extractJsonValue(modStr, "repo");
+                mod.name = extractJsonValue(modStr, "name");
+                mod.author = extractJsonValue(modStr, "author");
+                mod.description = extractJsonValue(modStr, "description");
+                mod.version = extractJsonValue(modStr, "version");
+                mod.lastUpdated = extractJsonValue(modStr, "lastUpdated");
+                
+                String starsStr = extractJsonValue(modStr, "stars");
+                try {
+                    mod.stars = Integer.parseInt(starsStr);
+                } catch (Exception e) {
+                    mod.stars = 0;
+                }
+                
+                if (mod.repo != null && mod.name != null) {
+                    mods.add(mod);
+                }
+            }
         } catch (Exception e) {
-            return 0;
+            Log.err("Failed to parse mod list", e);
         }
+        
+        return mods;
     }
     
-    class ModStats {
-        int downloads;
-        int releases;
+    String extractJsonValue(String json, String key) {
+        try {
+            String search = "\"" + key + "\"";
+            int start = json.indexOf(search);
+            if (start == -1) return "";
+            
+            start = json.indexOf(":", start) + 1;
+            start = json.indexOf("\"", start) + 1;
+            int end = json.indexOf("\"", start);
+            
+            if (start > 0 && end > start) {
+                return json.substring(start, end)
+                    .replace("\\n", "\n")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\");
+            }
+        } catch (Exception e) {}
+        return "";
+    }
+    
+    void loadModIcon(ModInfo mod) {
+        Core.app.post(() -> {
+            try {
+                // Extract owner and repo name from repo URL
+                String repoUrl = mod.repo.replace("https://github.com/", "");
+                String[] parts = repoUrl.split("/");
+                if (parts.length < 2) return;
+                
+                String owner = parts[0];
+                String repoName = parts[1];
+                
+                // Try to fetch icon.png from repository
+                String iconUrl = "https://raw.githubusercontent.com/" + owner + "/" + repoName + "/master/icon.png";
+                
+                HttpURLConnection conn = (HttpURLConnection) new URL(iconUrl).openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    InputStream in = conn.getInputStream();
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    
+                    byte[] data = new byte[4096];
+                    int n;
+                    while ((n = in.read(data, 0, data.length)) != -1) {
+                        buffer.write(data, 0, n);
+                    }
+                    in.close();
+                    
+                    byte[] imageData = buffer.toByteArray();
+                    
+                    Core.app.post(() -> {
+                        try {
+                            Pixmap pixmap = new Pixmap(imageData, 0, imageData.length);
+                            mod.iconTexture = new Texture(pixmap);
+                            pixmap.dispose();
+                        } catch (Exception e) {
+                            Log.err("Failed to create texture for " + mod.name, e);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.err("Failed to load icon for " + mod.name, e);
+            }
+        });
+    }
+    
+    // Part 2 of 2 - Add this ModInfo class at the end of TestMod.java
+    
+    class ModInfo {
+        String repo;
+        String name;
+        String author;
+        String description;
+        String version;
+        String lastUpdated;
         int stars;
+        Texture iconTexture;
+        boolean iconLoading;
     }
 }
