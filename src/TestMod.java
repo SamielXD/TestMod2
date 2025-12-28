@@ -1,4 +1,4 @@
-// ModInfo+ for Mindustry 154 - COMPLETE CODE WITH BADGES (v154 Compatible)
+// ModInfo+ for Mindustry 154 - FIXED SPRITE LOADING
 
 import arc.*;
 import arc.func.*;
@@ -28,7 +28,7 @@ public class TestMod extends Mod {
     private Label pageLabel;
     private Table navButtons;
     
-    // Badge textures - Using TextureRegion for v154 compatibility
+    // Badge textures
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
 
@@ -44,24 +44,28 @@ public class TestMod extends Mod {
     
     void loadBadgeTextures() {
         try {
-            // Try to load from atlas - v154 compatible method
-            TextureRegion javaRegion = Core.atlas.find("testmod-java");
-            TextureRegion jsRegion = Core.atlas.find("testmod-js");
+            // Load from assets/sprites/ - WITHOUT the mod prefix
+            // Just use the filename without .png
+            TextureRegion javaRegion = Core.atlas.find("java");
+            TextureRegion jsRegion = Core.atlas.find("js");
             
-            // Check if textures exist (v154 doesn't have .found() method)
-            // Check by comparing to error texture
+            // Check if textures exist
             TextureRegion errorRegion = Core.atlas.find("error");
             
             if (javaRegion != errorRegion && javaRegion.texture != null) {
                 javaBadge = javaRegion;
+                Log.info("Java badge loaded successfully!");
             } else {
                 javaBadge = null;
+                Log.warn("Java badge not found in assets/sprites/");
             }
             
             if (jsRegion != errorRegion && jsRegion.texture != null) {
                 jsBadge = jsRegion;
+                Log.info("JS badge loaded successfully!");
             } else {
                 jsBadge = null;
+                Log.warn("JS badge not found in assets/sprites/");
             }
         } catch (Exception e) {
             Log.err("Failed to load badge textures", e);
@@ -519,7 +523,7 @@ public class TestMod extends Mod {
     class ModInfo {
         String repo, name, author, description = "", version = "", lastUpdated = "";
         String modType; // "java" or "javascript"
-        TextureRegion iconTexture; // v154 compatible
+        TextureRegion iconTexture;
         boolean iconLoading;
     }
 
