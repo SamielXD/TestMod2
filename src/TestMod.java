@@ -70,14 +70,14 @@ public class TestMod extends Mod {
         browserDialog = new BaseDialog("ModInfo+");
         browserDialog.addCloseButton();
         Table main = new Table();
-        main.background(Tex.windowPane);
+        main.background(Tex.pane);
         main.table(searchBar -> {
             searchBar.image(Icon.zoom).size(20f).pad(5f);
             searchField = new TextField();
             searchField.setMessageText("Search mods...");
             searchField.changed(() -> updateSearchQuery(searchField.getText()));
             searchBar.add(searchField).growX().pad(5f);
-            searchBar.button(Icon.cancel, Styles.clearPartiali, () -> {
+            searchBar.button(Icon.cancel, Styles.clearNonei, () -> {
                 searchField.setText("");
                 updateSearchQuery("");
             }).size(40f);
@@ -100,7 +100,7 @@ public class TestMod extends Mod {
     
     void buildPaginationBar() {
         paginationBar.clearChildren();
-        paginationBar.button("◄", Styles.clearPartiali, () -> {
+        paginationBar.button("◄", Styles.clearNonei, () -> {
             if (currentPage > 0) {
                 currentPage--;
                 updateVisibleMods();
@@ -109,7 +109,7 @@ public class TestMod extends Mod {
         paginationBar.add().growX();
         paginationBar.label(() -> (currentPage + 1) + " / " + (getMaxPage() + 1));
         paginationBar.add().growX();
-        paginationBar.button("►", Styles.clearPartiali, () -> {
+        paginationBar.button("►", Styles.clearNonei, () -> {
             if (currentPage < getMaxPage()) {
                 currentPage++;
                 updateVisibleMods();
@@ -233,7 +233,7 @@ public class TestMod extends Mod {
         } catch (Exception e) {
             return dateStr;
         }
-            }void buildModRow(Table table, ModInfo mod) {
+    }void buildModRow(Table table, ModInfo mod) {
         table.table(Tex.button, card -> {
             card.margin(8f);
             card.left();
@@ -274,10 +274,10 @@ public class TestMod extends Mod {
             
             card.table(actions -> {
                 actions.defaults().size(40f);
-                actions.button(Icon.info, Styles.clearPartiali, () -> {
+                actions.button(Icon.info, Styles.clearNonei, () -> {
                     showModDetails(mod);
                 });
-                actions.button(Icon.link, Styles.clearPartiali, () -> {
+                actions.button(Icon.link, Styles.clearNonei, () -> {
                     Core.app.openURI(mod.repo);
                 });
             }).right().padRight(8f);
@@ -469,4 +469,4 @@ public class TestMod extends Mod {
         int releases = 0;
         int stars = 0;
     }
-                           }
+}
