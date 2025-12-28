@@ -100,7 +100,7 @@ public class TestMod extends Mod {
     
     void buildPaginationBar() {
         paginationBar.clearChildren();
-        paginationBar.button("◄", Styles.clearNonei, () -> {
+        paginationBar.button("◄", () -> {
             if (currentPage > 0) {
                 currentPage--;
                 updateVisibleMods();
@@ -109,7 +109,7 @@ public class TestMod extends Mod {
         paginationBar.add().growX();
         paginationBar.label(() -> (currentPage + 1) + " / " + (getMaxPage() + 1));
         paginationBar.add().growX();
-        paginationBar.button("►", Styles.clearNonei, () -> {
+        paginationBar.button("►", () -> {
             if (currentPage < getMaxPage()) {
                 currentPage++;
                 updateVisibleMods();
