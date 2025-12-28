@@ -195,9 +195,10 @@ public class TestMod extends Mod {
             content.add("").height(10).row();
         }
         
-        // Show "Loading stats..." and fetch in background
-        Label statsLabel = new Label("[accent]Loading statistics...");
-        content.add(statsLabel).pad(5f).row();
+        // Create stats table that we'll update
+        Table statsTable = new Table();
+        statsTable.add("[accent]Loading statistics...").pad(5f).row();
+        content.add(statsTable).pad(5f).row();
         
         // Buttons
         content.add("").height(15).row();
@@ -210,14 +211,12 @@ public class TestMod extends Mod {
         
         // Fetch detailed stats in background
         fetchModStats(mod, stats -> {
-            content.getCells().removeValue(statsLabel.getCell(), true);
-            content.row();
-            
-            content.add("[yellow]★ " + stats.stars + " [white]stars").pad(3f).row();
-            content.add("[accent]↓ " + stats.downloads + " [white]downloads").pad(3f).row();
-            content.add("[cyan]⚡ " + stats.releases + " [white]releases").pad(3f).row();
-            content.add("[lightgray]Version: " + mod.version).pad(3f).row();
-            content.add("[darkgray]Updated: " + formatDate(mod.lastUpdated)).pad(3f).row();
+            statsTable.clear();
+            statsTable.add("[yellow]★ " + stats.stars + " [white]stars").pad(3f).row();
+            statsTable.add("[accent]↓ " + stats.downloads + " [white]downloads").pad(3f).row();
+            statsTable.add("[cyan]⚡ " + stats.releases + " [white]releases").pad(3f).row();
+            statsTable.add("[lightgray]Version: " + mod.version).pad(3f).row();
+            statsTable.add("[darkgray]Updated: " + formatDate(mod.lastUpdated)).pad(3f).row();
         });
     }
     
