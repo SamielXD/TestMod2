@@ -1,3 +1,5 @@
+// ModInfo+ for Mindustry 154 - COMPLETE CODE WITH BADGES (v154 Compatible)
+
 import arc.*;
 import arc.func.*;
 import arc.graphics.*;
@@ -26,9 +28,9 @@ public class TestMod extends Mod {
     private Label pageLabel;
     private Table navButtons;
     
-    // Badge textures
-    private Texture javaBadge;
-    private Texture jsBadge;
+    // Badge textures - Using TextureRegion for v154 compatibility
+    private TextureRegion javaBadge;
+    private TextureRegion jsBadge;
 
     public TestMod() {
         Events.on(ClientLoadEvent.class, e -> {
@@ -42,17 +44,29 @@ public class TestMod extends Mod {
     
     void loadBadgeTextures() {
         try {
-            javaBadge = Core.atlas.find("testmod-java");
-            jsBadge = Core.atlas.find("testmod-js");
+            // Try to load from atlas - v154 compatible method
+            TextureRegion javaRegion = Core.atlas.find("testmod-java");
+            TextureRegion jsRegion = Core.atlas.find("testmod-js");
             
-            if (javaBadge == Core.atlas.find("error")) {
+            // Check if textures exist (v154 doesn't have .found() method)
+            // Check by comparing to error texture
+            TextureRegion errorRegion = Core.atlas.find("error");
+            
+            if (javaRegion != errorRegion && javaRegion.texture != null) {
+                javaBadge = javaRegion;
+            } else {
                 javaBadge = null;
             }
-            if (jsBadge == Core.atlas.find("error")) {
+            
+            if (jsRegion != errorRegion && jsRegion.texture != null) {
+                jsBadge = jsRegion;
+            } else {
                 jsBadge = null;
             }
         } catch (Exception e) {
             Log.err("Failed to load badge textures", e);
+            javaBadge = null;
+            jsBadge = null;
         }
     }
 
@@ -164,7 +178,7 @@ public class TestMod extends Mod {
                 mod.iconLoading = true;
                 loadModIconAsync(mod, iconImg);
             } else if (mod.iconTexture != null) {
-                iconImg.setDrawable(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)));
+                iconImg.setDrawable(new TextureRegionDrawable(mod.iconTexture));
             }
 
             Table info = new Table();
@@ -180,9 +194,9 @@ public class TestMod extends Mod {
             if (mod.modType != null) {
                 Image badge = null;
                 if (mod.modType.equals("java") && javaBadge != null) {
-                    badge = new Image(new TextureRegionDrawable(new TextureRegion(javaBadge)));
+                    badge = new Image(new TextureRegionDrawable(javaBadge));
                 } else if (mod.modType.equals("javascript") && jsBadge != null) {
-                    badge = new Image(new TextureRegionDrawable(new TextureRegion(jsBadge)));
+                    badge = new Image(new TextureRegionDrawable(jsBadge));
                 }
                 
                 // Fallback to text badges if images not loaded
@@ -218,7 +232,7 @@ public class TestMod extends Mod {
         content.defaults().left().padBottom(8f);
 
         if (mod.iconTexture != null) {
-            content.image(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)))
+            content.image(new TextureRegionDrawable(mod.iconTexture))
                 .size(64f).center().row();
         } else {
             content.image(Icon.book).size(64f).center().row();
@@ -231,9 +245,9 @@ public class TestMod extends Mod {
         if (mod.modType != null) {
             Image badge = null;
             if (mod.modType.equals("java") && javaBadge != null) {
-                badge = new Image(new TextureRegionDrawable(new TextureRegion(javaBadge)));
+                badge = new Image(new TextureRegionDrawable(javaBadge));
             } else if (mod.modType.equals("javascript") && jsBadge != null) {
-                badge = new Image(new TextureRegionDrawable(new TextureRegion(jsBadge)));
+                badge = new Image(new TextureRegionDrawable(jsBadge));
             }
             
             if (badge == null) {
@@ -367,8 +381,9 @@ public class TestMod extends Mod {
                     Core.app.post(() -> {
                         try {
                             Pixmap pixmap = new Pixmap(imageData, 0, imageData.length);
-                            mod.iconTexture = new Texture(pixmap);
-                            iconImg.setDrawable(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)));
+                            Texture texture = new Texture(pixmap);
+                            mod.iconTexture = new TextureRegion(texture);
+                            iconImg.setDrawable(new TextureRegionDrawable(mod.iconTexture));
                             pixmap.dispose();
                         } catch (Exception e) {
                             mod.iconLoading = false;
@@ -504,11 +519,11 @@ public class TestMod extends Mod {
     class ModInfo {
         String repo, name, author, description = "", version = "", lastUpdated = "";
         String modType; // "java" or "javascript"
-        Texture iconTexture;
+        TextureRegion iconTexture; // v154 compatible
         boolean iconLoading;
     }
 
     class ModStats {
         int downloads, releases, stars;
     }
-                           }
+}
