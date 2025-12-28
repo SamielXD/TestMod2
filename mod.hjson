@@ -1,23 +1,37 @@
-#the mod name as displayed in-game
-displayName: "Java Mod Template"
+name: "modinfo"
+displayName: "[cyan]ModInfo+[] [accent]Enhanced[]"
+author: "[accent]SamielXD[]"
+description: '''
+[accent]ModInfo+ Enhanced Browser v1.0[]
 
-#the internal name of your mod
-name: "example-java-mod"
+[cyan]Imported to Java for better performance![]
 
-#your name
-author: "SamielXD"
+Enhanced mod browser with language badges, search, and real-time GitHub statistics.
 
-#the fully qualified main class of the mod
-main: "TestMod"
+[accent]━━━━━━━━━━━━━━━━━━[]
 
-#the mod description as seen in the mod dialog
-description: "A Mindustry Java mod template."
+🌟 [accent]Features[]
 
-#the mod version
-version: 1.0
+[lime]✓[] Language badges (Java/JS)
+[lime]✓[] Search mods by name/author
+[lime]✓[] Real-time GitHub stats
+[lime]✓[] Download counts & stars
+[lime]✓[] Replaces default browser
+[lime]✓[] Fast async loading
 
-#the minimum game build required to run this mod
-minGameVersion: 154
+[accent]━━━━━━━━━━━━━━━━━━[]
 
-#this is a java mod
-java: true
+🎮 [accent]How to Use[]
+
+Open [cyan]Mods[] → [accent]Mod Browser[]
+Search or browse mods with badges
+Click icons for details or GitHub
+
+[accent]━━━━━━━━━━━━━━━━━━[]
+
+Thanks for using ModInfo+! 🎉
+'''
+version: "1.0"
+minGameVersion: "154"
+dependencies: []
+hidden: false
