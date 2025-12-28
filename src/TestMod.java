@@ -14,7 +14,6 @@ import mindustry.gen.*;
 import mindustry.mod.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
-import mindustry.ctype.*;
 import arc.util.serialization.*;
 import java.net.*;
 import java.io.*;
@@ -30,6 +29,7 @@ public class TestMod extends Mod {
     private int modsPerPage = 8;
     private String searchQuery = "";
     
+    private BaseDialog browserDialog;
     private Table modListContainer;
     private Label statusLabel;
     private TextField searchField;
@@ -53,7 +53,7 @@ public class TestMod extends Mod {
         
         Events.on(ClientLoadEvent.class, e -> {
             Core.app.post(() -> {
-                enhanceModMenu();
+                hookModsBrowser();
             });
         });
     }
@@ -84,35 +84,44 @@ public class TestMod extends Mod {
                     break;
                 }
             }
-        } catch (Exception e) {
-            Log.err("Badge load failed", e);
-        }
+        } catch (Exception e) {}
     }
     
-    void enhanceModMenu() {
-        try {
-            BaseDialog modsDialog = Vars.ui.mods;
-            
-            modsDialog.cont.row();
-            modsDialog.cont.table(mainSection -> {
-                mainSection.background(modCardBg);
-                mainSection.margin(10f);
-                
-                buildEnhancedSection(mainSection);
-                
-            }).growX().pad(10f);
-            
-        } catch (Exception e) {
-            Log.err("Menu enhance failed", e);
+    void hookModsBrowser() {
+        BaseDialog mods = Vars.ui.mods;
+
+        for (Element el : mods.buttons.getChildren()) {
+            if (el instanceof TextButton) {
+                TextButton b = (TextButton) el;
+                if (b.getText().toString().toLowerCase().contains("browser")) {
+                    b.clearListeners();
+                    b.clicked(() -> showEnhancedBrowser());
+                    Log.info("Mod browser replaced!");
+                    return;
+                }
+            }
         }
+
+        Log.err("Browser button not found");
     }
     
-    void buildEnhancedSection(Table section) {
-        section.table(headerBg, header -> {
+    void showEnhancedBrowser() {
+        if (browserDialog != null) {
+            browserDialog.show();
+            return;
+        }
+
+        browserDialog = new BaseDialog("@mods.browser");
+        browserDialog.addCloseButton();
+        
+        Table main = new Table();
+        main.background(modCardBg);
+        
+        main.table(headerBg, header -> {
             header.add("[accent]━━━ [cyan]ModInfo+ Enhanced[] [accent]━━━").pad(8f);
         }).growX().row();
         
-        section.table(searchBar -> {
+        main.table(searchBar -> {
             searchBar.image(Icon.zoom).size(20f).pad(5f);
             
             searchField = new TextField();
@@ -130,21 +139,23 @@ public class TestMod extends Mod {
         }).growX().pad(5f).row();
         
         statusLabel = new Label("");
-        section.add(statusLabel).pad(5f).row();
+        main.add(statusLabel).pad(5f).row();
         
         modListContainer = new Table();
         ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
         pane.setScrollingDisabled(true, false);
-        section.add(pane).grow().maxHeight(400f).row();
+        main.add(pane).grow().row();
         
         paginationBar = new Table();
         buildPaginationBar();
-        section.add(paginationBar).growX().pad(5f).row();
+        main.add(paginationBar).growX().pad(5f).row();
         
-        section.button("Load Mod List", Icon.download, () -> {
+        main.button("Load Mod List", Icon.download, () -> {
             fetchModList();
         }).size(160f, 50f).pad(8f);
+        
+        browserDialog.cont.add(main).grow();
         
         updateStatusLabel("Click 'Load Mod List' to start");
     }
