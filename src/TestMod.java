@@ -1,4 +1,4 @@
-// Part 1 of 2 - Copy this first part into TestMod.java
+// Enhanced ModInfo for Mindustry 154 - Full code in one file
 
 import arc.*;
 import arc.func.*;
@@ -6,6 +6,7 @@ import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
+import arc.scene.style.*;
 import arc.struct.*;
 import arc.util.*;
 import mindustry.*;
@@ -72,9 +73,9 @@ public class TestMod extends Mod {
             Table iconTable = new Table();
             iconTable.image().size(48f).update(img -> {
                 if (mod.iconTexture != null) {
-                    img.setDrawable(new TextureRegionDrawable(mod.iconTexture));
+                    img.setDrawable(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)));
                 } else if (!mod.iconLoading) {
-                    img.setDrawable(Icon.modSmall);
+                    img.setDrawable(Icon.book);
                 }
             }).pad(4f);
             
@@ -84,9 +85,14 @@ public class TestMod extends Mod {
             Table info = new Table();
             info.left();
             info.add("[accent]" + mod.name).left().row();
-            info.add("[lightgray]" + mod.author).left().fontSize(0.8f).row();
-            info.add("[gray]" + mod.description).left().width(300f).wrap().fontSize(0.75f).row();
-            info.add("[white]Stars: [yellow]" + mod.stars + " [white]Version: [cyan]" + mod.version).left().fontSize(0.75f).row();
+            info.add("[lightgray]" + mod.author).left().get().setFontScale(0.8f);
+            info.row();
+            info.add("[gray]" + (mod.description.length() > 100 ? mod.description.substring(0, 100) + "..." : mod.description))
+                .left().width(300f).wrap().get().setFontScale(0.75f);
+            info.row();
+            info.add("[white]Stars: [yellow]" + mod.stars + " [white]Version: [cyan]" + mod.version)
+                .left().get().setFontScale(0.75f);
+            info.row();
             
             t.add(info).growX().padRight(10f);
             
@@ -277,15 +283,13 @@ public class TestMod extends Mod {
         });
     }
     
-    // Part 2 of 2 - Add this ModInfo class at the end of TestMod.java
-    
     class ModInfo {
         String repo;
         String name;
         String author;
-        String description;
-        String version;
-        String lastUpdated;
+        String description = "";
+        String version = "";
+        String lastUpdated = "";
         int stars;
         Texture iconTexture;
         boolean iconLoading;
