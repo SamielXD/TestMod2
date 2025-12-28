@@ -24,8 +24,9 @@ public class TestMod extends Mod {
     private BaseDialog browserDialog;
     private Table modList;
     private int currentPage = 0;
-    private int modsPerPage = 25; // Show 25 mods per page
+    private int modsPerPage = 12; // Show only 12 mods per page for smoothness
     private Label pageLabel;
+    private Table navButtons;
     
     public TestMod() {
         Events.on(ClientLoadEvent.class, e -> {
@@ -59,23 +60,23 @@ public class TestMod extends Mod {
         browserDialog.cont.add(pane).grow().row();
         
         // Navigation buttons
-        Table nav = new Table();
-        nav.button("◄ Previous", () -> {
+        navButtons = new Table();
+        navButtons.button("◄ Previous", () -> {
             if (currentPage > 0) {
                 currentPage--;
                 displayCurrentPage();
             }
-        }).width(150f).padRight(10f);
+        }).width(150f).padRight(10f).disabled(b -> currentPage == 0);
         
-        nav.button("Next ►", () -> {
+        navButtons.button("Next ►", () -> {
             int maxPage = (allMods.size - 1) / modsPerPage;
             if (currentPage < maxPage) {
                 currentPage++;
                 displayCurrentPage();
             }
-        }).width(150f);
+        }).width(150f).disabled(b -> currentPage >= (allMods.size - 1) / modsPerPage);
         
-        browserDialog.cont.add(nav).pad(10f).row();
+        browserDialog.cont.add(navButtons).pad(10f).row();
         browserDialog.show();
         
         // Load mods in background
@@ -135,48 +136,47 @@ public class TestMod extends Mod {
             ModInfo mod = allMods.get(i);
             buildSimpleModEntry(modList, mod);
         }
+        
+        // Update nav button states
+        navButtons.getCells().get(0).get().setDisabled(currentPage == 0);
+        navButtons.getCells().get(1).get().setDisabled(currentPage >= maxPage);
     }
     
     void buildSimpleModEntry(Table table, ModInfo mod) {
         // Simplified entry - much faster to render
         table.button(b -> {
             b.left();
-            b.margin(8f);
+            b.margin(6f);
             
-            // Icon (48x48)
+            // Icon (40x40 - smaller = faster)
             Image iconImg = new Image(Icon.book);
             iconImg.setScaling(Scaling.fit);
-            b.add(iconImg).size(48f).padRight(12f);
+            b.add(iconImg).size(40f).padRight(10f);
             
-            // Load icon async if not loaded
+            // Load icon async if not loaded (and only for current page)
             if (mod.iconTexture == null && !mod.iconLoading) {
                 mod.iconLoading = true;
                 loadModIconAsync(mod, iconImg);
+            } else if (mod.iconTexture != null) {
+                iconImg.setDrawable(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)));
             }
             
-            // Info section
+            // Info section - simplified
             Table info = new Table();
             info.left();
             info.defaults().left();
             
-            // Title
+            // Title only
             info.add("[accent]" + mod.name).row();
             
-            // Author + Date
+            // Author + Date on same line
             String dateStr = formatDate(mod.lastUpdated);
             info.add("[lightgray]" + mod.author + " [darkgray]• " + dateStr)
-                .padTop(2f).get().setFontScale(0.85f);
-            info.row();
+                .padTop(2f).get().setFontScale(0.8f);
             
-            // Description (shortened)
-            String desc = mod.description;
-            if (desc.length() > 70) desc = desc.substring(0, 70) + "...";
-            info.add("[gray]" + desc).width(400f).wrap().padTop(4f)
-                .get().setFontScale(0.8f);
+            b.add(info).growX().padRight(5f);
             
-            b.add(info).growX();
-            
-        }, () -> showModDetails(mod)).growX().height(80f).pad(3f).row();
+        }, () -> showModDetails(mod)).growX().height(60f).pad(2f).row();
     }
     
     void showModDetails(ModInfo mod) {
@@ -286,6 +286,7 @@ public class TestMod extends Mod {
     }
     
     void loadModIconAsync(ModInfo mod, Image iconImg) {
+        // Only load if really needed
         Core.app.post(() -> {
             try {
                 String repoUrl = mod.repo.replace("https://github.com/", "");
@@ -296,14 +297,14 @@ public class TestMod extends Mod {
                 
                 HttpURLConnection conn = (HttpURLConnection) new URL(iconUrl).openConnection();
                 conn.setRequestProperty("User-Agent", "ModInfo-Plus");
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
+                conn.setConnectTimeout(2000); // Shorter timeout
+                conn.setReadTimeout(2000);
                 
                 if (conn.getResponseCode() == 200) {
                     InputStream in = conn.getInputStream();
                     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                     
-                    byte[] data = new byte[4096];
+                    byte[] data = new byte[2048]; // Smaller buffer
                     int n;
                     while ((n = in.read(data)) != -1) {
                         buffer.write(data, 0, n);
@@ -312,16 +313,21 @@ public class TestMod extends Mod {
                     
                     byte[] imageData = buffer.toByteArray();
                     
+                    // Only update if icon is still needed
                     Core.app.post(() -> {
                         try {
                             Pixmap pixmap = new Pixmap(imageData, 0, imageData.length);
                             mod.iconTexture = new Texture(pixmap);
                             iconImg.setDrawable(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)));
                             pixmap.dispose();
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                            mod.iconLoading = false; // Reset on error
+                        }
                     });
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                mod.iconLoading = false; // Reset on error
+            }
         });
     }
     
