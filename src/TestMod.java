@@ -1,4 +1,4 @@
-// Enhanced ModInfo for Mindustry 154 - Smooth & Fast
+// ModInfo+ for Mindustry 154 - Ultra Smooth with Pagination
 
 import arc.*;
 import arc.func.*;
@@ -23,11 +23,14 @@ public class TestMod extends Mod {
     private Seq<ModInfo> allMods = new Seq<>();
     private BaseDialog browserDialog;
     private Table modList;
+    private int currentPage = 0;
+    private int modsPerPage = 25; // Show 25 mods per page
+    private Label pageLabel;
     
     public TestMod() {
         Events.on(ClientLoadEvent.class, e -> {
             // Add button inside the mods menu
-            Vars.ui.mods.buttons.button("Browse All Mods", Icon.download, () -> {
+            Vars.ui.mods.buttons.button("ModInfo+", Icon.download, () -> {
                 showModBrowser();
             }).size(200f, 50f);
         });
@@ -39,15 +42,40 @@ public class TestMod extends Mod {
             return;
         }
         
-        browserDialog = new BaseDialog("Mod Browser");
+        browserDialog = new BaseDialog("ModInfo+ Browser");
         browserDialog.addCloseButton();
         
         modList = new Table();
         ScrollPane pane = new ScrollPane(modList);
         pane.setFadeScrollBars(false);
+        pane.setScrollingDisabled(true, false);
         
-        browserDialog.cont.add("[accent]Loading mods...").row();
+        // Header with page info
+        Table header = new Table();
+        pageLabel = new Label("[accent]Loading mods...");
+        header.add(pageLabel).growX().center();
+        
+        browserDialog.cont.add(header).growX().pad(10f).row();
         browserDialog.cont.add(pane).grow().row();
+        
+        // Navigation buttons
+        Table nav = new Table();
+        nav.button("◄ Previous", () -> {
+            if (currentPage > 0) {
+                currentPage--;
+                displayCurrentPage();
+            }
+        }).width(150f).padRight(10f);
+        
+        nav.button("Next ►", () -> {
+            int maxPage = (allMods.size - 1) / modsPerPage;
+            if (currentPage < maxPage) {
+                currentPage++;
+                displayCurrentPage();
+            }
+        }).width(150f);
+        
+        browserDialog.cont.add(nav).pad(10f).row();
         browserDialog.show();
         
         // Load mods in background
@@ -60,7 +88,7 @@ public class TestMod extends Mod {
                 String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                conn.setRequestProperty("User-Agent", "ModInfo-Plus");
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(10000);
                 
@@ -74,99 +102,81 @@ public class TestMod extends Mod {
                 
                 Seq<ModInfo> mods = parseModList(response.toString());
                 
-                // Sort: recently updated first, then by stars
+                // Sort: recently updated first
                 mods.sort(m -> -parseTimestamp(m.lastUpdated));
                 
                 Core.app.post(() -> {
                     allMods = mods;
-                    displayMods();
+                    currentPage = 0;
+                    displayCurrentPage();
                 });
                 
             } catch (Exception ex) {
                 Log.err("Failed to fetch mod list", ex);
                 Core.app.post(() -> {
-                    browserDialog.cont.clear();
-                    browserDialog.cont.add("[scarlet]Failed to load mods").row();
-                    ScrollPane pane = new ScrollPane(modList);
-                    browserDialog.cont.add(pane).grow().row();
+                    pageLabel.setText("[scarlet]Failed to load mods");
                 });
             }
         });
     }
     
-    void displayMods() {
-        browserDialog.cont.clear();
-        
-        // Header
-        Table header = new Table();
-        header.add("[accent]Found " + allMods.size + " mods").padBottom(5);
-        browserDialog.cont.add(header).growX().row();
-        
-        // Mod list
-        ScrollPane pane = new ScrollPane(modList);
-        pane.setFadeScrollBars(false);
-        browserDialog.cont.add(pane).grow().row();
-        
+    void displayCurrentPage() {
         modList.clear();
-        modList.margin(10f);
+        modList.margin(5f);
         
-        // Add mods one by one (smooth rendering)
-        int[] index = {0};
-        Timer.schedule(new Timer.Task() {
-            @Override
-            public void run() {
-                if (index[0] < allMods.size) {
-                    buildModEntry(modList, allMods.get(index[0]));
-                    index[0]++;
-                } else {
-                    this.cancel();
-                }
-            }
-        }, 0f, 0.02f); // Add one mod every 0.02 seconds
+        int start = currentPage * modsPerPage;
+        int end = Math.min(start + modsPerPage, allMods.size);
+        int maxPage = (allMods.size - 1) / modsPerPage;
+        
+        pageLabel.setText("[accent]" + allMods.size + " mods | Page " + (currentPage + 1) + "/" + (maxPage + 1));
+        
+        // Render ONLY the current page (fast!)
+        for (int i = start; i < end; i++) {
+            ModInfo mod = allMods.get(i);
+            buildSimpleModEntry(modList, mod);
+        }
     }
     
-    void buildModEntry(Table table, ModInfo mod) {
-        table.table(Tex.button, t -> {
-            t.margin(8f);
+    void buildSimpleModEntry(Table table, ModInfo mod) {
+        // Simplified entry - much faster to render
+        table.button(b -> {
+            b.left();
+            b.margin(8f);
             
-            // Left side - Icon placeholder
-            Stack iconStack = new Stack();
-            Table iconTable = new Table();
-            
+            // Icon (48x48)
             Image iconImg = new Image(Icon.book);
-            iconStack.add(iconImg);
+            iconImg.setScaling(Scaling.fit);
+            b.add(iconImg).size(48f).padRight(12f);
             
-            // Loading indicator
+            // Load icon async if not loaded
             if (mod.iconTexture == null && !mod.iconLoading) {
                 mod.iconLoading = true;
-                // Load icon in background
                 loadModIconAsync(mod, iconImg);
             }
             
-            t.add(iconStack).size(48f).pad(4f);
-            
-            // Middle - Basic Info (no stats yet)
+            // Info section
             Table info = new Table();
             info.left();
+            info.defaults().left();
             
-            info.add("[accent]" + mod.name).left().row();
-            info.add("[lightgray]by " + mod.author).left().padTop(2f).row();
+            // Title
+            info.add("[accent]" + mod.name).row();
             
+            // Author + Date
+            String dateStr = formatDate(mod.lastUpdated);
+            info.add("[lightgray]" + mod.author + " [darkgray]• " + dateStr)
+                .padTop(2f).get().setFontScale(0.85f);
+            info.row();
+            
+            // Description (shortened)
             String desc = mod.description;
-            if (desc.length() > 80) desc = desc.substring(0, 80) + "...";
-            info.add("[gray]" + desc).left().width(350f).wrap().padTop(4f).row();
+            if (desc.length() > 70) desc = desc.substring(0, 70) + "...";
+            info.add("[gray]" + desc).width(400f).wrap().padTop(4f)
+                .get().setFontScale(0.8f);
             
-            info.add("[darkgray]Updated: " + formatDate(mod.lastUpdated))
-                .left().padTop(4f).get().setFontScale(0.7f);
+            b.add(info).growX();
             
-            t.add(info).growX().padLeft(10f).padRight(10f);
-            
-            // Right side - View button
-            t.button("View", Icon.right, Styles.cleart, () -> {
-                showModDetails(mod);
-            }).size(80f, 50f).padRight(5f);
-            
-        }).growX().pad(4f).row();
+        }, () -> showModDetails(mod)).growX().height(80f).pad(3f).row();
     }
     
     void showModDetails(ModInfo mod) {
@@ -174,56 +184,58 @@ public class TestMod extends Mod {
         detailDialog.addCloseButton();
         
         Table content = new Table();
-        ScrollPane pane = new ScrollPane(content);
-        
         content.margin(15f);
-        content.defaults().left();
+        content.defaults().left().padBottom(8f);
         
         // Icon
         if (mod.iconTexture != null) {
             content.image(new TextureRegionDrawable(new TextureRegion(mod.iconTexture)))
-                .size(64f).pad(10f).row();
+                .size(64f).center().row();
+        } else {
+            content.image(Icon.book).size(64f).center().row();
         }
         
-        content.add("[accent]" + mod.name).pad(5f).row();
-        content.add("[lightgray]by " + mod.author).pad(3f).row();
-        content.add("").height(10).row();
+        content.add("[accent]" + mod.name).center().row();
+        content.add("[lightgray]by " + mod.author).center().padBottom(15f).row();
         
         // Description
         if (mod.description != null && !mod.description.isEmpty()) {
-            content.add("[white]" + mod.description).width(450f).wrap().pad(5f).row();
-            content.add("").height(10).row();
+            content.add("[white]" + mod.description).width(450f).wrap().row();
         }
         
-        // Create stats table that we'll update
-        Table statsTable = new Table();
-        statsTable.add("[accent]Loading statistics...").pad(5f).row();
-        content.add(statsTable).pad(5f).row();
+        content.add("").height(10).row();
         
-        // Buttons
-        content.add("").height(15).row();
+        // Stats loading
+        Table statsTable = new Table();
+        statsTable.defaults().left().padBottom(5f);
+        statsTable.add("[accent]Loading statistics...").row();
+        content.add(statsTable).row();
+        
+        content.add("").height(10).row();
+        
+        // GitHub button
         content.button("Open on GitHub", Icon.link, () -> {
             Core.app.openURI(mod.repo);
-        }).size(200f, 50f).pad(5f).row();
+        }).size(200f, 50f);
         
-        detailDialog.cont.add(pane).grow();
+        ScrollPane detailPane = new ScrollPane(content);
+        detailDialog.cont.add(detailPane).grow();
         detailDialog.show();
         
-        // Fetch detailed stats in background
+        // Fetch stats async
         fetchModStats(mod, stats -> {
             statsTable.clear();
-            statsTable.add("[yellow]★ " + stats.stars + " [white]stars").pad(3f).row();
-            statsTable.add("[accent]↓ " + stats.downloads + " [white]downloads").pad(3f).row();
-            statsTable.add("[cyan]⚡ " + stats.releases + " [white]releases").pad(3f).row();
-            statsTable.add("[lightgray]Version: " + mod.version).pad(3f).row();
-            statsTable.add("[darkgray]Updated: " + formatDate(mod.lastUpdated)).pad(3f).row();
+            statsTable.add("[yellow]★ " + stats.stars + " [white]stars").row();
+            statsTable.add("[accent]↓ " + stats.downloads + " [white]downloads").row();
+            statsTable.add("[cyan]⚡ " + stats.releases + " [white]releases").row();
+            statsTable.add("[lightgray]Version: " + mod.version).row();
+            statsTable.add("[darkgray]Updated: " + formatDate(mod.lastUpdated)).row();
         });
     }
     
     void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
         Core.app.post(() -> {
             try {
-                // Extract owner/repo from URL
                 String repoUrl = mod.repo.replace("https://github.com/", "");
                 String[] parts = repoUrl.split("/");
                 if (parts.length < 2) return;
@@ -234,7 +246,7 @@ public class TestMod extends Mod {
                 // Get releases
                 String releasesUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases";
                 HttpURLConnection relConn = (HttpURLConnection) new URL(releasesUrl).openConnection();
-                relConn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                relConn.setRequestProperty("User-Agent", "ModInfo-Plus");
                 relConn.setConnectTimeout(5000);
                 relConn.setReadTimeout(5000);
                 
@@ -249,7 +261,7 @@ public class TestMod extends Mod {
                 // Get repo info
                 String repoApiUrl = "https://api.github.com/repos/" + owner + "/" + repo;
                 HttpURLConnection repoConn = (HttpURLConnection) new URL(repoApiUrl).openConnection();
-                repoConn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                repoConn.setRequestProperty("User-Agent", "ModInfo-Plus");
                 repoConn.setConnectTimeout(5000);
                 repoConn.setReadTimeout(5000);
                 
@@ -268,7 +280,7 @@ public class TestMod extends Mod {
                 Core.app.post(() -> callback.get(stats));
                 
             } catch (Exception e) {
-                Log.err("Failed to fetch stats for " + mod.name, e);
+                Log.err("Failed to fetch stats", e);
             }
         });
     }
@@ -283,7 +295,7 @@ public class TestMod extends Mod {
                 String iconUrl = "https://raw.githubusercontent.com/" + parts[0] + "/" + parts[1] + "/master/icon.png";
                 
                 HttpURLConnection conn = (HttpURLConnection) new URL(iconUrl).openConnection();
-                conn.setRequestProperty("User-Agent", "ModInfo-Enhanced");
+                conn.setRequestProperty("User-Agent", "ModInfo-Plus");
                 conn.setConnectTimeout(3000);
                 conn.setReadTimeout(3000);
                 
@@ -364,7 +376,6 @@ public class TestMod extends Mod {
     
     long parseTimestamp(String dateStr) {
         try {
-            // Simple year-month-day comparison
             String[] parts = dateStr.split("-");
             if (parts.length >= 3) {
                 long year = Long.parseLong(parts[0]) * 10000000000L;
@@ -400,7 +411,7 @@ public class TestMod extends Mod {
         int index = 0;
         while ((index = data.indexOf(search, index)) != -1) {
             index += search.length();
-            int end = Math.min(data.indexOf(",", index), data.indexOf("}", index));
+            int end = data.indexOf(",", index);
             if (end == -1) end = data.indexOf("}", index);
             try {
                 total += Integer.parseInt(data.substring(index, end).trim());
@@ -414,7 +425,8 @@ public class TestMod extends Mod {
             int start = data.indexOf("\"stargazers_count\":");
             if (start == -1) return 0;
             start += 19;
-            int end = Math.min(data.indexOf(",", start), data.indexOf("}", start));
+            int end = data.indexOf(",", start);
+            if (end == -1) end = data.indexOf("}", start);
             return Integer.parseInt(data.substring(start, end).trim());
         } catch (Exception e) {
             return 0;
