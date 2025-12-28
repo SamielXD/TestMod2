@@ -22,7 +22,7 @@ public class TestMod extends Mod {
     private Seq<ModInfo> filteredMods = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private int currentPage = 0;
-    private int modsPerPage = 8;
+    private int modsPerPage = 10;
     private String searchQuery = "";
     private BaseDialog browserDialog;
     private Table modListContainer;
@@ -30,6 +30,8 @@ public class TestMod extends Mod {
     private TextField searchField;
     private Table paginationBar;
     private Color accentColor = Color.valueOf("ffd37f");
+    private TextureRegion javaBadge;
+    private TextureRegion jsBadge;
 
     public TestMod() {
         Log.info("ModInfo+ Enhanced: Initializing");
@@ -39,9 +41,17 @@ public class TestMod extends Mod {
     public void init() {
         Events.on(ClientLoadEvent.class, e -> {
             Core.app.post(() -> {
+                loadBadges();
                 addModInfoButton();
             });
         });
+    }
+    
+    void loadBadges() {
+        javaBadge = Core.atlas.find("testmod-java");
+        jsBadge = Core.atlas.find("testmod-js");
+        Log.info("Java badge: " + (javaBadge.found() ? "YES" : "NO"));
+        Log.info("JS badge: " + (jsBadge.found() ? "YES" : "NO"));
     }
     
     void addModInfoButton() {
@@ -49,7 +59,7 @@ public class TestMod extends Mod {
         TextButton btn = new TextButton("ModInfo+");
         btn.clicked(() -> showEnhancedBrowser());
         mods.buttons.add(btn).size(200f, 64f);
-        Log.info("ModInfo+ button added successfully!");
+        Log.info("ModInfo+ button added!");
     }
     
     void showEnhancedBrowser() {
@@ -57,71 +67,54 @@ public class TestMod extends Mod {
             browserDialog.show();
             return;
         }
-
-        browserDialog = new BaseDialog("ModInfo+ Enhanced");
+        browserDialog = new BaseDialog("ModInfo+");
         browserDialog.addCloseButton();
-        
         Table main = new Table();
-        main.background(Tex.button);
-        
-        main.table(Tex.underline, header -> {
-            header.add("[accent]━━━ [cyan]ModInfo+ Enhanced[] [accent]━━━").pad(8f);
-        }).growX().row();
-        
+        main.background(Tex.windowPane);
         main.table(searchBar -> {
             searchBar.image(Icon.zoom).size(20f).pad(5f);
             searchField = new TextField();
-            searchField.setMessageText("Search by name or author...");
-            searchField.changed(() -> {
-                updateSearchQuery(searchField.getText());
-            });
+            searchField.setMessageText("Search mods...");
+            searchField.changed(() -> updateSearchQuery(searchField.getText()));
             searchBar.add(searchField).growX().pad(5f);
-            searchBar.button(Icon.cancel, () -> {
+            searchBar.button(Icon.cancel, Styles.clearPartiali, () -> {
                 searchField.setText("");
                 updateSearchQuery("");
-            }).size(40f).pad(3f);
-        }).growX().pad(5f).row();
-        
+            }).size(40f);
+        }).fillX().pad(10f).row();
         statusLabel = new Label("");
         main.add(statusLabel).pad(5f).row();
-        
         modListContainer = new Table();
         ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
         pane.setScrollingDisabled(true, false);
-        main.add(pane).grow().row();
-        
+        main.add(pane).grow().pad(5f).row();
         paginationBar = new Table();
         buildPaginationBar();
-        main.add(paginationBar).growX().pad(5f).row();
-        
-        main.button("Load Mod List", Icon.download, () -> {
-            fetchModList();
-        }).size(160f, 50f).pad(8f);
-        
+        main.add(paginationBar).fillX().pad(5f).row();
+        main.button("Load Mods", Icon.download, () -> fetchModList()).size(200f, 50f).pad(8f);
         browserDialog.cont.add(main).grow();
         browserDialog.show();
-        updateStatusLabel("Click 'Load Mod List' to start");
+        updateStatusLabel("Click 'Load Mods'");
     }
     
     void buildPaginationBar() {
         paginationBar.clearChildren();
-        paginationBar.button("◄ Prev", () -> {
+        paginationBar.button("◄", Styles.clearPartiali, () -> {
             if (currentPage > 0) {
                 currentPage--;
                 updateVisibleMods();
             }
-        }).width(100f).disabled(b -> currentPage == 0);
+        }).size(50f).disabled(b -> currentPage == 0);
         paginationBar.add().growX();
-        paginationBar.label(() -> "Page " + (currentPage + 1) + "/" + (getMaxPage() + 1));
+        paginationBar.label(() -> (currentPage + 1) + " / " + (getMaxPage() + 1));
         paginationBar.add().growX();
-        paginationBar.button("Next ►", () -> {
-            int maxPage = getMaxPage();
-            if (currentPage < maxPage) {
+        paginationBar.button("►", Styles.clearPartiali, () -> {
+            if (currentPage < getMaxPage()) {
                 currentPage++;
                 updateVisibleMods();
             }
-        }).width(100f).disabled(b -> currentPage >= getMaxPage());
+        }).size(50f).disabled(b -> currentPage >= getMaxPage());
     }
     
     void updateSearchQuery(String query) {
@@ -143,7 +136,9 @@ public class TestMod extends Mod {
                 }
             }
         }
-    }void updateVisibleMods() {
+    }
+    
+    void updateVisibleMods() {
         modListContainer.clearChildren();
         int start = currentPage * modsPerPage;
         int end = Math.min(start + modsPerPage, filteredMods.size);
@@ -154,7 +149,7 @@ public class TestMod extends Mod {
                 buildModRow(modListContainer, filteredMods.get(i));
             }
         }
-        updateStatusLabel(filteredMods.size + " mods • Page " + (currentPage + 1) + "/" + (getMaxPage() + 1));
+        updateStatusLabel(filteredMods.size + " mods");
     }
     
     void updateStatusLabel(String text) {
@@ -166,7 +161,7 @@ public class TestMod extends Mod {
     }
     
     void fetchModList() {
-        updateStatusLabel("[cyan]Loading mod list...");
+        updateStatusLabel("[cyan]Loading...");
         Core.app.post(() -> {
             try {
                 String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
@@ -180,7 +175,7 @@ public class TestMod extends Mod {
                 String line;
                 while ((line = reader.readLine()) != null) response.append(line);
                 reader.close();
-                Seq<ModInfo> mods = parseModListProper(response.toString());
+                Seq<ModInfo> mods = parseModList(response.toString());
                 mods.sort(m -> -m.lastUpdatedTime);
                 Core.app.post(() -> {
                     allMods = mods;
@@ -189,13 +184,13 @@ public class TestMod extends Mod {
                     updateVisibleMods();
                 });
             } catch (Exception ex) {
-                Core.app.post(() -> updateStatusLabel("[scarlet]Failed to load mods: " + ex.getMessage()));
-                Log.err("ModInfo+ fetch error", ex);
+                Core.app.post(() -> updateStatusLabel("[scarlet]Failed to load"));
+                Log.err("Fetch error", ex);
             }
         });
     }
     
-    Seq<ModInfo> parseModListProper(String json) {
+    Seq<ModInfo> parseModList(String json) {
         Seq<ModInfo> mods = new Seq<>();
         try {
             JsonValue root = new JsonReader().parse(json);
@@ -238,65 +233,84 @@ public class TestMod extends Mod {
         } catch (Exception e) {
             return dateStr;
         }
-    }
-
-    void buildModRow(Table table, ModInfo mod) {
-        table.table(Tex.button, row -> {
-            row.left();
-            row.margin(6f);
-            row.defaults().left();
-            Image iconImg = new Image(Icon.box);
-            iconImg.setScaling(Scaling.fit);
-            row.add(iconImg).size(44f).pad(4f);
-            row.table(info -> {
-                info.left();
-                info.defaults().left();
-                info.table(titleRow -> {
-                    titleRow.left();
-                    Label nameLabel = new Label("[accent]" + mod.name);
-                    nameLabel.setEllipsis(true);
-                    titleRow.add(nameLabel).maxWidth(180f).padRight(6f);
-                    if (mod.isJava) {
-                        titleRow.add("[#b07219]JAVA");
-                    } else {
-                        titleRow.add("[#f1e05a]JS");
-                    }
-                }).growX().row();
-                Label authorLabel = new Label("[lightgray]" + mod.author);
-                authorLabel.setFontScale(0.85f);
-                info.add(authorLabel).padTop(2f).row();
-                Label dateLabel = new Label("[darkgray]" + formatDate(mod.lastUpdated));
-                dateLabel.setFontScale(0.8f);
-                info.add(dateLabel).padTop(2f);
-            }).growX().pad(5f);
-            row.table(actions -> {
-                actions.defaults().size(36f).pad(2f);
-                actions.button(Icon.info, Styles.clearNonei, () -> {
+            }void buildModRow(Table table, ModInfo mod) {
+        table.table(Tex.button, card -> {
+            card.margin(8f);
+            card.left();
+            
+            card.table(left -> {
+                left.left();
+                left.image(Icon.box).size(48f).pad(4f);
+                
+                left.table(info -> {
+                    info.left();
+                    info.defaults().left();
+                    
+                    info.table(titleRow -> {
+                        titleRow.left();
+                        Label nameLabel = new Label(mod.name);
+                        nameLabel.setColor(accentColor);
+                        titleRow.add(nameLabel).padRight(8f);
+                        
+                        if (mod.isJava) {
+                            if (javaBadge != null && javaBadge.found()) {
+                                titleRow.image(javaBadge).size(32f, 18f);
+                            } else {
+                                titleRow.add("[#b07219]JAVA").style(Styles.outlineLabel);
+                            }
+                        } else {
+                            if (jsBadge != null && jsBadge.found()) {
+                                titleRow.image(jsBadge).size(32f, 18f);
+                            } else {
+                                titleRow.add("[#f1e05a]JS").style(Styles.outlineLabel);
+                            }
+                        }
+                    }).row();
+                    
+                    info.add("[lightgray]" + mod.author).padTop(2f).row();
+                    info.add("[darkgray]" + formatDate(mod.lastUpdated)).padTop(2f);
+                }).growX().pad(8f);
+            }).growX();
+            
+            card.table(actions -> {
+                actions.defaults().size(40f);
+                actions.button(Icon.info, Styles.clearPartiali, () -> {
                     showModDetails(mod);
-                }).row();
-                actions.button(Icon.link, Styles.clearNonei, () -> {
+                });
+                actions.button(Icon.link, Styles.clearPartiali, () -> {
                     Core.app.openURI(mod.repo);
                 });
-            }).right().padRight(4f);
-        }).fillX().height(70f).pad(2f).row();
-        table.image().height(1f).growX().color(Color.darkGray).pad(1f).row();
-    }void showModDetails(ModInfo mod) {
+            }).right().padRight(8f);
+            
+        }).fillX().pad(2f).row();
+    }
+    
+    void showModDetails(ModInfo mod) {
         BaseDialog dialog = new BaseDialog(mod.name);
         dialog.addCloseButton();
-        
         Table content = new Table();
         content.background(Tex.button);
         content.margin(15f);
-        content.defaults().center().pad(5f);
         
-        content.image(Icon.box).size(72f).pad(8f).row();
+        content.image(Icon.box).size(64f).pad(8f).row();
         
-        Table titleTable = new Table();
-        titleTable.add("[accent]" + mod.name).padRight(10f);
-        titleTable.add(mod.isJava ? "[#b07219]JAVA MOD" : "[#f1e05a]JS MOD");
-        content.add(titleTable).row();
-        
-        content.add("[cyan]by " + mod.author).pad(4f).row();
+        Table titleRow = new Table();
+        titleRow.add("[accent]" + mod.name).padRight(10f);
+        if (mod.isJava) {
+            if (javaBadge != null && javaBadge.found()) {
+                titleRow.image(javaBadge).size(40f, 22f);
+            } else {
+                titleRow.add("[#b07219]JAVA");
+            }
+        } else {
+            if (jsBadge != null && jsBadge.found()) {
+                titleRow.image(jsBadge).size(40f, 22f);
+            } else {
+                titleRow.add("[#f1e05a]JS");
+            }
+        }
+        content.add(titleRow).row();
+        content.add("[cyan]" + mod.author).pad(4f).row();
         
         if (mod.description != null && !mod.description.isEmpty()) {
             Label desc = new Label(mod.description);
@@ -305,33 +319,30 @@ public class TestMod extends Mod {
             content.add(desc).width(400f).pad(8f).row();
         }
         
-        content.image().height(2f).growX().color(accentColor).pad(6f).row();
+        content.image().height(2f).width(300f).color(accentColor).pad(8f).row();
         
         Table statsTable = new Table();
         statsTable.add("[cyan]⟳ Loading stats...").pad(10f);
         content.add(statsTable).row();
         
-        content.image().height(2f).growX().color(accentColor).pad(6f).row();
+        content.image().height(2f).width(300f).color(accentColor).pad(8f).row();
         
         content.button("Open on GitHub", Icon.link, () -> {
             Core.app.openURI(mod.repo);
-        }).size(200f, 48f);
+        }).size(200f, 48f).pad(8f);
         
         ScrollPane pane = new ScrollPane(content);
         dialog.cont.add(pane).grow();
         dialog.show();
-        
         loadGitHubStats(mod, statsTable);
     }
-
+    
     void loadGitHubStats(ModInfo mod, Table statsTable) {
         String key = mod.repo;
-        
         if (statsCache.containsKey(key)) {
             displayStats(statsTable, mod, statsCache.get(key));
             return;
         }
-        
         fetchModStats(mod, stats -> {
             if (stats != null) {
                 statsCache.put(key, stats);
@@ -341,97 +352,77 @@ public class TestMod extends Mod {
             }
         });
     }
-
+    
     void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
         Core.app.post(() -> {
             statsTable.clearChildren();
             statsTable.defaults().left().pad(4f);
-            
             statsTable.add("[yellow]★ Stars:").padRight(10f);
             statsTable.add("[accent]" + stats.stars).row();
-            
             statsTable.add("[lime]↓ Downloads:").padRight(10f);
             statsTable.add("[lime]" + stats.downloads).row();
-            
             statsTable.add("[cyan]⚡ Releases:").padRight(10f);
             statsTable.add("[cyan]" + stats.releases).row();
-            
             statsTable.add("[lightgray]📦 Version:").padRight(10f);
             statsTable.add("[lightgray]" + mod.version).row();
-            
             statsTable.add("[darkgray]🕐 Updated:").padRight(10f);
             statsTable.add("[darkgray]" + formatDate(mod.lastUpdated)).row();
         });
     }
-
+    
     void displayStatsError(Table statsTable, ModInfo mod) {
         Core.app.post(() -> {
             statsTable.clearChildren();
             statsTable.defaults().left().pad(4f);
-            
             statsTable.add("[scarlet]✗ Could not load stats").colspan(2).row();
-            
             statsTable.add("[lightgray]📦 Version:").padRight(10f);
             statsTable.add("[lightgray]" + mod.version).row();
-            
             statsTable.add("[darkgray]🕐 Updated:").padRight(10f);
             statsTable.add("[darkgray]" + formatDate(mod.lastUpdated)).row();
         });
     }
-
+    
     void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
         Core.app.post(() -> {
             HttpURLConnection repoConn = null;
             HttpURLConnection relConn = null;
-            
             try {
                 String repoUrl = mod.repo.replace("https://github.com/", "");
                 String[] parts = repoUrl.split("/");
-                
                 if (parts.length < 2) {
                     callback.get(null);
                     return;
                 }
-
                 String owner = parts[0];
                 String repo = parts[1];
-
                 repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
                 repoConn.setRequestProperty("User-Agent", "ModInfo-Plus/1.0");
                 repoConn.setConnectTimeout(8000);
                 repoConn.setReadTimeout(8000);
-
                 if (repoConn.getResponseCode() != 200) {
                     callback.get(null);
                     return;
                 }
-
                 BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
                 StringBuilder repoData = new StringBuilder();
                 String line;
                 while ((line = repoReader.readLine()) != null) repoData.append(line);
                 repoReader.close();
-
                 relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
                 relConn.setRequestProperty("User-Agent", "ModInfo-Plus/1.0");
                 relConn.setConnectTimeout(8000);
                 relConn.setReadTimeout(8000);
-
                 ModStats stats = new ModStats();
-
                 if (relConn.getResponseCode() == 200) {
                     BufferedReader relReader = new BufferedReader(new InputStreamReader(relConn.getInputStream()));
                     StringBuilder relData = new StringBuilder();
                     while ((line = relReader.readLine()) != null) relData.append(line);
                     relReader.close();
-
                     try {
                         JsonValue repoJson = new JsonReader().parse(repoData.toString());
                         stats.stars = repoJson.getInt("stargazers_count", 0);
-                        
                         JsonValue releasesJson = new JsonReader().parse(relData.toString());
                         stats.releases = releasesJson.size;
-                        
                         int totalDownloads = 0;
                         for (JsonValue release : releasesJson) {
                             JsonValue assets = release.get("assets");
@@ -442,7 +433,6 @@ public class TestMod extends Mod {
                             }
                         }
                         stats.downloads = totalDownloads;
-                        
                     } catch (Exception e) {
                         Log.err("Stats parse error", e);
                     }
@@ -450,23 +440,15 @@ public class TestMod extends Mod {
                     try {
                         JsonValue repoJson = new JsonReader().parse(repoData.toString());
                         stats.stars = repoJson.getInt("stargazers_count", 0);
-                    } catch (Exception e) {
-                        Log.err("Repo parse error", e);
-                    }
+                    } catch (Exception e) {}
                 }
-
                 callback.get(stats);
-
             } catch (Exception e) {
-                Log.err("GitHub API error for " + mod.name, e);
+                Log.err("GitHub API error", e);
                 callback.get(null);
             } finally {
-                if (repoConn != null) {
-                    try { repoConn.disconnect(); } catch (Exception ignored) {}
-                }
-                if (relConn != null) {
-                    try { relConn.disconnect(); } catch (Exception ignored) {}
-                }
+                if (repoConn != null) try { repoConn.disconnect(); } catch (Exception e) {}
+                if (relConn != null) try { relConn.disconnect(); } catch (Exception e) {}
             }
         });
     }
@@ -481,10 +463,10 @@ public class TestMod extends Mod {
         long lastUpdatedTime = 0;
         boolean isJava = false;
     }
-
+    
     class ModStats {
         int downloads = 0;
         int releases = 0;
         int stars = 0;
     }
-}
+                           }
