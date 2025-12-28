@@ -48,10 +48,11 @@ public class TestMod extends Mod {
     }
     
     void loadBadges() {
-        javaBadge = Core.atlas.find("testmod-java");
-        jsBadge = Core.atlas.find("testmod-js");
-        Log.info("Java badge: " + (javaBadge.found() ? "YES" : "NO"));
-        Log.info("JS badge: " + (jsBadge.found() ? "YES" : "NO"));
+        javaBadge = Core.atlas.find("testmod-java-badge");
+        jsBadge = Core.atlas.find("testmod-js-badge");
+        if (!javaBadge.found()) javaBadge = Core.atlas.find("error");
+        if (!jsBadge.found()) jsBadge = Core.atlas.find("error");
+        Log.info("Badges loaded");
     }
     
     void addModInfoButton() {
@@ -59,7 +60,6 @@ public class TestMod extends Mod {
         TextButton btn = new TextButton("ModInfo+");
         btn.clicked(() -> showEnhancedBrowser());
         mods.buttons.add(btn).size(200f, 64f);
-        Log.info("ModInfo+ button added!");
     }
     
     void showEnhancedBrowser() {
@@ -233,7 +233,9 @@ public class TestMod extends Mod {
         } catch (Exception e) {
             return dateStr;
         }
-    }void buildModRow(Table table, ModInfo mod) {
+    }
+
+    void buildModRow(Table table, ModInfo mod) {
         table.table(Tex.button, card -> {
             card.margin(8f);
             card.left();
@@ -252,18 +254,10 @@ public class TestMod extends Mod {
                         nameLabel.setColor(accentColor);
                         titleRow.add(nameLabel).padRight(8f);
                         
-                        if (mod.isJava) {
-                            if (javaBadge != null && javaBadge.found()) {
-                                titleRow.image(javaBadge).size(32f, 18f);
-                            } else {
-                                titleRow.add("[#b07219]JAVA").style(Styles.outlineLabel);
-                            }
-                        } else {
-                            if (jsBadge != null && jsBadge.found()) {
-                                titleRow.image(jsBadge).size(32f, 18f);
-                            } else {
-                                titleRow.add("[#f1e05a]JS").style(Styles.outlineLabel);
-                            }
+                        if (mod.isJava && javaBadge.found()) {
+                            titleRow.image(javaBadge).size(24f, 16f).padLeft(4f);
+                        } else if (!mod.isJava && jsBadge.found()) {
+                            titleRow.image(jsBadge).size(24f, 16f).padLeft(4f);
                         }
                     }).row();
                     
@@ -296,18 +290,10 @@ public class TestMod extends Mod {
         
         Table titleRow = new Table();
         titleRow.add("[accent]" + mod.name).padRight(10f);
-        if (mod.isJava) {
-            if (javaBadge != null && javaBadge.found()) {
-                titleRow.image(javaBadge).size(40f, 22f);
-            } else {
-                titleRow.add("[#b07219]JAVA");
-            }
-        } else {
-            if (jsBadge != null && jsBadge.found()) {
-                titleRow.image(jsBadge).size(40f, 22f);
-            } else {
-                titleRow.add("[#f1e05a]JS");
-            }
+        if (mod.isJava && javaBadge.found()) {
+            titleRow.image(javaBadge).size(32f, 20f);
+        } else if (!mod.isJava && jsBadge.found()) {
+            titleRow.image(jsBadge).size(32f, 20f);
         }
         content.add(titleRow).row();
         content.add("[cyan]" + mod.author).pad(4f).row();
