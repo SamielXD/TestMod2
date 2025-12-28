@@ -66,7 +66,7 @@ public class TestMod extends Mod {
                 currentPage--;
                 displayCurrentPage();
             }
-        }).width(150f).padRight(10f).disabled(b -> currentPage == 0);
+        }).width(150f).padRight(10f);
         
         navButtons.button("Next ►", () -> {
             int maxPage = (allMods.size - 1) / modsPerPage;
@@ -74,7 +74,7 @@ public class TestMod extends Mod {
                 currentPage++;
                 displayCurrentPage();
             }
-        }).width(150f).disabled(b -> currentPage >= (allMods.size - 1) / modsPerPage);
+        }).width(150f);
         
         browserDialog.cont.add(navButtons).pad(10f).row();
         browserDialog.show();
@@ -136,10 +136,6 @@ public class TestMod extends Mod {
             ModInfo mod = allMods.get(i);
             buildSimpleModEntry(modList, mod);
         }
-        
-        // Update nav button states
-        navButtons.getCells().get(0).get().setDisabled(currentPage == 0);
-        navButtons.getCells().get(1).get().setDisabled(currentPage >= maxPage);
     }
     
     void buildSimpleModEntry(Table table, ModInfo mod) {
