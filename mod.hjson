@@ -33,5 +33,6 @@ Thanks for using ModInfo+! 🎉
 '''
 version: "1.0"
 minGameVersion: "154"
+main: "TestMod"
 dependencies: []
 hidden: false
