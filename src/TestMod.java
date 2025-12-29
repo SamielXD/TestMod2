@@ -258,8 +258,8 @@ public class TestMod extends Mod {
                 info.description = mod.meta.description;
                 info.version = mod.meta.version;
                 info.hasJava = mod.meta.java;
-                info.hasScripts = mod.meta.hasScripts;
-                info.isServerCompatible = !mod.meta.clientSide;
+                info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
+                info.isServerCompatible = true;
             } else {
                 info.name = mod.name;
                 info.author = "Unknown";
