@@ -250,7 +250,7 @@ public class TestMod extends Mod {
     }
 
     void buildModRow(Table table, ModInfo mod) {
-        LoadedMod installed = Vars.mods.list().find(m -> m.name.equals(mod.name) || m.meta.displayName().equals(mod.name));
+        Mods.LoadedMod installed = Vars.mods.list().find(m -> m.name.equals(mod.name) || m.meta.name.equals(mod.name));
         
         table.table(Tex.button, row -> {
             row.left();
@@ -328,7 +328,7 @@ public class TestMod extends Mod {
             Vars.ui.showErrorMessage("Install failed: " + e.getMessage());
         }
     }void showModDetails(ModInfo mod) {
-        LoadedMod installed = Vars.mods.list().find(m -> m.name.equals(mod.name) || m.meta.displayName().equals(mod.name));
+        Mods.LoadedMod installed = Vars.mods.list().find(m -> m.name.equals(mod.name) || m.meta.name.equals(mod.name));
         
         BaseDialog dialog = new BaseDialog(mod.name);
         dialog.addCloseButton();
