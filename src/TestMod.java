@@ -64,9 +64,9 @@ public class TestMod extends Mod {
             Core.app.post(() -> {
                 loadBadges();
                 loadModIcons();
-                addModInfoButton();
             });
         });
+        addModInfoButton();
     }
     
     void loadBadges() {
@@ -96,25 +96,31 @@ public class TestMod extends Mod {
     
     // FIXED: Button now has icon and renamed to "ModInfo+"
     void addModInfoButton() {
-        Core.app.post(() -> {
-            try {
-                Element modsButton = Vars.ui.menufrag.getChildren().find(e -> 
-                    e instanceof TextButton && ((TextButton)e).getText().toString().toLowerCase().contains("mod")
-                );
-                
-                if(modsButton != null) {
-                    modsButton.clicked(() -> {
-                        showEnhancedBrowser();
-                    });
-                    Log.info("ModInfo+: Hijacked vanilla mods button");
+        Events.on(ClientLoadEvent.class, event -> {
+            Core.app.post(() -> {
+                try {
+                    Table menu = (Table)Vars.ui.menufrag.getClass().getDeclaredField("menu").get(Vars.ui.menufrag);
+                    for(Element child : menu.getChildren()) {
+                        if(child instanceof TextButton) {
+                            TextButton btn = (TextButton)child;
+                            if(btn.getText().toString().toLowerCase().contains("mod")) {
+                                btn.clearListeners();
+                                btn.clicked(() -> {
+                                    showEnhancedBrowser();
+                                });
+                                Log.info("ModInfo+: Hijacked mods button successfully");
+                                return;
+                            }
+                        }
+                    }
+                } catch(Exception e) {
+                    Log.err("Failed to hijack mods button, using fallback", e);
+                    BaseDialog mods = Vars.ui.mods;
+                    TextButton btn = new TextButton("ModInfo+");
+                    btn.clicked(() -> showEnhancedBrowser());
+                    mods.buttons.add(btn).size(210f, 64f);
                 }
-            } catch(Exception e) {
-                Log.err("Failed to hijack mods button", e);
-                BaseDialog mods = Vars.ui.mods;
-                TextButton btn = new TextButton("ModInfo+");
-                btn.clicked(() -> showEnhancedBrowser());
-                mods.buttons.add(btn).size(210f, 64f);
-            }
+            });
         });
     }
     
