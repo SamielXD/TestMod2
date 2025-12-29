@@ -51,8 +51,9 @@ public class TestMod extends Mod {
     private TextureRegion jsBadge;
     private TextureRegion jsonBadge;
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
-    private int currentTab = 0; // 0 = installed, 1 = browser
-    private String sortMode = "updated"; // updated, stars, name
+    private int currentTab = 0;
+    private String sortMode = "updated";
+    private long lastRefreshTime = 0;
 
     public TestMod() {
         Log.info("ModInfo+ Browser Initializing");
@@ -94,7 +95,6 @@ public class TestMod extends Mod {
         Log.info("Loaded " + modIcons.size + " mod icons");
     }
     
-    // FIXED: Button now has icon and renamed to "ModInfo+"
     void addModInfoButton() {
         Events.on(ClientLoadEvent.class, event -> {
             Time.runTask(60f, () -> {
@@ -232,9 +232,9 @@ public class TestMod extends Mod {
             });
         }).fillX().row();
         
-        browserDialog.cont.add(main).size(900f, 750f);
+        browserDialog.cont.add(main).size(1100f, 850f);
         browserDialog.show();
-        updateStatusLabel("Click Load to browse installed mods");
+        updateStatusLabel("Click Load to browse mods");
     }
     
     void reloadMods() {
@@ -464,33 +464,27 @@ void buildModRow(Table table, ModInfo mod) {
                 
                 if(mod.hasJava) {
                     if(javaBadge != null && javaBadge.found()) {
-                        badges.image(javaBadge).size(24f, 16f).padRight(4f).clicked(() -> {
-                            Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code");
-                        });
+                        Image img = badges.image(javaBadge).size(24f, 16f).padRight(4f).get();
+                        img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                     } else {
-                        badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).clicked(() -> {
-                            Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code");
-                        });
+                        Label lbl = badges.add("[white]JAVA").style(Styles.outlineLabel).padRight(4f).get();
+                        lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                     }
                 } else if(mod.hasScripts) {
-                    badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).clicked(() -> {
-                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts");
-                    });
+                    Label lbl = badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).get();
+                    lbl.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts"));
                 }
                 
-                badges.image(Icon.book).size(16f).color(Color.valueOf("89e051")).padRight(4f).clicked(() -> {
-                    Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata");
-                });
+                Image jsonImg = badges.image(Icon.book).size(16f).color(Color.valueOf("89e051")).padRight(4f).get();
+                jsonImg.clicked(() -> Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata"));
                 
                 if(installed != null) {
                     if(mod.isServerCompatible) {
-                        badges.image(Icon.host).size(16f).color(Color.sky).padRight(4f).clicked(() -> {
-                            Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer servers");
-                        });
+                        Image hostImg = badges.image(Icon.host).size(16f).color(Color.sky).padRight(4f).get();
+                        hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer servers"));
                     } else {
-                        badges.image(Icon.players).size(16f).color(Color.orange).padRight(4f).clicked(() -> {
-                            Vars.ui.showInfo("[accent]Client Only\n[lightgray]Single-player only");
-                        });
+                        Image clientImg = badges.image(Icon.players).size(16f).color(Color.orange).padRight(4f).get();
+                        clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]Single-player only"));
                     }
                 }
                 
@@ -698,34 +692,28 @@ void loadModStatsInline(ModInfo mod, Table infoTable) {
     
     if(mod.hasJava) {
         if(javaBadge != null && javaBadge.found()) {
-            badges.image(javaBadge).size(40f, 26f).padRight(10f).clicked(() -> {
-                Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code");
-            });
+            Image img = badges.image(javaBadge).size(40f, 26f).padRight(10f).get();
+            img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
         } else {
-            badges.add("[white]JAVA").style(Styles.outlineLabel).padRight(10f).clicked(() -> {
-                Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code");
-            });
+            Label lbl = badges.add("[white]JAVA").style(Styles.outlineLabel).padRight(10f).get();
+            lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
         }
     } else if(mod.hasScripts) {
-        badges.add("[white]JS").style(Styles.outlineLabel).padRight(10f).clicked(() -> {
-            Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript");
-        });
+        Label lbl = badges.add("[white]JS").style(Styles.outlineLabel).padRight(10f).get();
+        lbl.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript"));
     }
     
-    badges.image(Icon.book).size(24f).color(Color.valueOf("89e051")).padRight(10f).clicked(() -> {
-        Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata");
-    });
+    Image jsonImg = badges.image(Icon.book).size(24f).color(Color.valueOf("89e051")).padRight(10f).get();
+    jsonImg.clicked(() -> Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata"));
     
     if(installed != null) {
         if(mod.isServerCompatible) {
-            badges.image(Icon.host).size(24f).color(Color.sky).padRight(8f).clicked(() -> {
-                Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers");
-            });
+            Image hostImg = badges.image(Icon.host).size(24f).color(Color.sky).padRight(8f).get();
+            hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
             badges.add("[sky]Server Compatible").style(Styles.outlineLabel).padRight(10f);
         } else {
-            badges.image(Icon.players).size(24f).color(Color.orange).padRight(8f).clicked(() -> {
-                Vars.ui.showInfo("[accent]Client Only\n[lightgray]This mod only works in singleplayer");
-            });
+            Image clientImg = badges.image(Icon.players).size(24f).color(Color.orange).padRight(8f).get();
+            clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]This mod only works in singleplayer"));
             badges.add("[orange]Client Only").style(Styles.outlineLabel).padRight(10f);
         }
     }
