@@ -48,8 +48,8 @@ public class TestMod extends Mod {
     }
     
     void loadBadges() {
-        javaBadge = Core.atlas.find("java-badge");
-        jsBadge = Core.atlas.find("js-badge");
+        javaBadge = Core.atlas.find("testmod-java-badge");
+        jsBadge = Core.atlas.find("testmod-js-badge");
         Log.info("Badge load: Java=" + javaBadge.found() + " JS=" + jsBadge.found());
     }
     
