@@ -97,27 +97,42 @@ public class TestMod extends Mod {
     
     void addModInfoButton() {
         Events.on(ClientLoadEvent.class, event -> {
-            Time.runTask(60f, () -> {
+            Time.runTask(120f, () -> {
                 try {
                     java.lang.reflect.Field menuField = Vars.ui.menufrag.getClass().getDeclaredField("menu");
                     menuField.setAccessible(true);
                     Table menu = (Table)menuField.get(Vars.ui.menufrag);
                     
+                    boolean found = false;
                     for(Element child : menu.getChildren()) {
                         if(child instanceof TextButton) {
                             TextButton btn = (TextButton)child;
                             String text = btn.getText().toString().toLowerCase();
                             if(text.contains("mod")) {
-                                btn.clearListeners();
-                                btn.clicked(() -> showEnhancedBrowser());
+                                btn.getListeners().clear();
+                                btn.clicked(() -> {
+                                    showEnhancedBrowser();
+                                });
+                                found = true;
                                 Log.info("ModInfo+: Successfully hijacked mods button!");
-                                return;
+                                break;
                             }
                         }
                     }
-                    Log.warn("ModInfo+: Could not find mods button");
+                    
+                    if(!found) {
+                        Log.warn("ModInfo+: Could not find mods button, adding fallback");
+                        Vars.ui.mods.shown(() -> {
+                            Vars.ui.mods.hide();
+                            showEnhancedBrowser();
+                        });
+                    }
                 } catch(Exception e) {
                     Log.err("ModInfo+: Hijack failed", e);
+                    Vars.ui.mods.shown(() -> {
+                        Vars.ui.mods.hide();
+                        showEnhancedBrowser();
+                    });
                 }
             });
         });
