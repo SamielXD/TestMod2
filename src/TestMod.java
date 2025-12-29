@@ -97,13 +97,12 @@ public class TestMod extends Mod {
     
     void addModInfoButton() {
         Events.on(ClientLoadEvent.class, event -> {
-            Time.runTask(6f, () -> { // CHANGED: was 120f
+            Core.app.post(() -> {
                 try {
                     java.lang.reflect.Field menuField = Vars.ui.menufrag.getClass().getDeclaredField("menu");
                     menuField.setAccessible(true);
                     Table menu = (Table)menuField.get(Vars.ui.menufrag);
                     
-                    boolean found = false;
                     for(Element child : menu.getChildren()) {
                         if(child instanceof TextButton) {
                             TextButton btn = (TextButton)child;
@@ -113,27 +112,21 @@ public class TestMod extends Mod {
                                 btn.clicked(() -> {
                                     showEnhancedBrowser();
                                 });
-                                found = true;
-                                Log.info("ModInfo+: Successfully hijacked mods button!");
-                                break;
+                                Log.info("ModInfo+: Hijacked mods button instantly!");
+                                return;
                             }
                         }
                     }
-                    
-                    if(!found) {
-                        Log.warn("ModInfo+: Could not find mods button, adding fallback");
-                        Vars.ui.mods.shown(() -> {
-                            Vars.ui.mods.hide();
-                            showEnhancedBrowser();
-                        });
-                    }
                 } catch(Exception e) {
-                    Log.err("ModInfo+: Hijack failed", e);
-                    Vars.ui.mods.shown(() -> {
+                    Log.err("ModInfo+: Hijack failed, using dialog intercept", e);
+                }
+                
+                Vars.ui.mods.shown(() -> {
+                    Core.app.post(() -> {
                         Vars.ui.mods.hide();
                         showEnhancedBrowser();
                     });
-                }
+                });
             });
         });
     }
@@ -150,18 +143,15 @@ public class TestMod extends Mod {
         main.background(Tex.pane);
         
         Table header = new Table();
-        header.background(Tex.button);
-        header.image(Icon.info).size(40f).padLeft(15f).padRight(10f);
-        header.add("[accent]MODINFO+ BROWSER").style(Styles.outlineLabel).size(280f, 50f).left();
-        header.add().growX();
+        header.background(Tex.buttonEdge3);
         
-        header.label(() -> {
-            long elapsed = (Time.millis() - lastRefreshTime) / 1000;
-            return "[lightgray]Refreshed " + elapsed + "s ago";
-        }).padRight(15f).visible(() -> lastRefreshTime > 0);
+        header.table(left -> {
+            left.image(Icon.box).size(48f).color(accentColor).pad(10f);
+            left.add("[accent]MODINFO+").style(Styles.outlineLabel).growX().left().padLeft(10f);
+        }).growX().left();
         
         header.table(tabs -> {
-            tabs.defaults().size(120f, 50f).pad(5f);
+            tabs.defaults().size(100f, 45f).pad(3f);
             tabs.button("Installed", Styles.togglet, () -> {
                 currentTab = 0;
                 fetchModList();
@@ -170,86 +160,88 @@ public class TestMod extends Mod {
                 currentTab = 1;
                 fetchRemoteMods();
             }).checked(b -> currentTab == 1);
-        }).padRight(10f);
+        }).padRight(5f);
         
-        header.button(Icon.refresh, Styles.cleari, 40f, () -> {
+        header.button(Icon.refresh, Styles.cleari, () -> {
             reloadMods();
-        }).size(50f).tooltip("Refresh").padRight(10f);
-        header.button(Icon.cancel, Styles.cleari, 40f, () -> {
+        }).size(45f).tooltip("Refresh").pad(5f);
+        
+        header.button(Icon.cancel, Styles.cleari, () -> {
             browserDialog.hide();
-        }).size(50f).tooltip("Close").padRight(10f);
-        main.add(header).fillX().height(60f).row();
+        }).size(45f).tooltip("Close").pad(5f);
         
-        main.image().color(accentColor).fillX().height(3f).row();
+        main.add(header).fillX().height(65f).row();
         
-        main.table(sortBar -> {
-            sortBar.background(Tex.button);
-            sortBar.add("[lightgray]Sort: ").padLeft(15f).padRight(10f);
-            sortBar.defaults().size(110f, 45f).pad(5f);
-            sortBar.button("Updated", Styles.togglet, () -> {
-                sortMode = "updated";
-                applySort();
-            }).checked(b -> sortMode.equals("updated"));
-            sortBar.button("Stars", Styles.togglet, () -> {
-                sortMode = "stars";
-                applySort();
-            }).checked(b -> sortMode.equals("stars"));
-            sortBar.button("Name", Styles.togglet, () -> {
-                sortMode = "name";
-                applySort();
-            }).checked(b -> sortMode.equals("name"));
-        }).fillX().height(60f).pad(10f).padTop(5f).row();
+        main.image().color(accentColor).fillX().height(2f).row();
+        
+        main.table(controls -> {
+            controls.background(Tex.button);
+            
+            controls.table(sortBar -> {
+                sortBar.add("[lightgray]Sort:").padRight(8f);
+                sortBar.defaults().size(90f, 40f).pad(3f);
+                sortBar.button("Recent", Styles.togglet, () -> {
+                    sortMode = "updated";
+                    applySort();
+                }).checked(b -> sortMode.equals("updated"));
+                sortBar.button("Stars", Styles.togglet, () -> {
+                    sortMode = "stars";
+                    applySort();
+                }).checked(b -> sortMode.equals("stars"));
+                sortBar.button("Name", Styles.togglet, () -> {
+                    sortMode = "name";
+                    applySort();
+                }).checked(b -> sortMode.equals("name"));
+            }).left().padLeft(10f);
+            
+            controls.add().growX();
+            
+            controls.label(() -> {
+                if(lastRefreshTime > 0) {
+                    long elapsed = (Time.millis() - lastRefreshTime) / 1000;
+                    return "[lightgray]" + elapsed + "s ago";
+                }
+                return "";
+            }).padRight(10f);
+            
+        }).fillX().height(55f).row();
         
         main.table(search -> {
             search.background(Tex.button);
-            search.image(Icon.zoom).size(32f).padLeft(15f).padRight(10f);
+            search.image(Icon.zoom).size(28f).pad(8f);
             searchField = new TextField();
             searchField.setMessageText("Search mods...");
             searchField.changed(() -> {
                 searchQuery = searchField.getText().toLowerCase();
                 currentPage = 0;
                 applyFilter();
-                updateVisibleMods();
             });
-            search.add(searchField).growX().height(45f).pad(10f);
-            search.button(Icon.cancelSmall, Styles.cleari, 32f, () -> {
+            search.add(searchField).growX().height(40f).pad(8f);
+            search.button(Icon.cancel, Styles.cleari, () -> {
                 searchField.setText("");
                 searchQuery = "";
                 currentPage = 0;
                 applyFilter();
-                updateVisibleMods();
-            }).size(45f).padRight(10f).visible(() -> !searchField.getText().isEmpty());
-        }).fillX().height(65f).pad(10f).padBottom(5f).row();
+            }).size(40f).visible(() -> !searchField.getText().isEmpty());
+        }).fillX().height(56f).padTop(2f).row();
         
         statusLabel = new Label("");
-        main.add(statusLabel).pad(8f).row();
+        main.add(statusLabel).pad(5f).row();
         
         modListContainer = new Table();
         ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
         pane.setScrollingDisabled(true, false);
         pane.setOverscroll(false, false);
-        main.add(pane).grow().pad(10f).padTop(5f).row();
+        main.add(pane).grow().pad(8f).row();
         
         paginationBar = new Table();
         buildPaginationBar();
-        main.add(paginationBar).fillX().row();
+        main.add(paginationBar).fillX().padBottom(5f).row();
         
-        main.table(actions -> {
-            actions.defaults().size(200f, 55f).pad(10f);
-            actions.button("Load Installed", Icon.download, () -> {
-                currentTab = 0;
-                fetchModList();
-            });
-            actions.button("Browse Mods", Icon.zoom, () -> {
-                currentTab = 1;
-                fetchRemoteMods();
-            });
-        }).fillX().row();
-        
-        browserDialog.cont.add(main).size(900f, 700f); // CHANGED: was 1100f, 850f
+        browserDialog.cont.add(main).size(1000f, 800f);
         browserDialog.show();
-        updateStatusLabel("Click Load to browse mods");
+        fetchModList();
     }
     
     void reloadMods() {
@@ -337,8 +329,7 @@ public class TestMod extends Mod {
     
     int getMaxPage() {
         return Math.max(0, (filteredMods.size - 1) / modsPerPage);
-    }
-}void fetchModList() {
+    }void fetchModList() {
     updateStatusLabel("[cyan]Loading installed mods...");
     Core.app.post(() -> {
         allMods.clear();
