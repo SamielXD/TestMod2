@@ -256,7 +256,7 @@ public class TestMod extends Mod {
             row.left();
             
             if (installed != null && installed.iconTexture != null) {
-                row.image(installed.iconTexture).size(64f).padLeft(10f).padRight(12f);
+                row.image(new TextureRegionDrawable(installed.iconTexture)).size(64f).padLeft(10f).padRight(12f);
             } else {
                 row.image(Icon.box).size(64f).padLeft(10f).padRight(12f);
             }
@@ -337,7 +337,7 @@ public class TestMod extends Mod {
         content.margin(15f);
         
         if (installed != null && installed.iconTexture != null) {
-            content.image(installed.iconTexture).size(80f).pad(10f).row();
+            content.image(new TextureRegionDrawable(installed.iconTexture)).size(80f).pad(10f).row();
         } else {
             content.image(Icon.box).size(80f).pad(10f).row();
         }
