@@ -37,7 +37,7 @@ public class TestMod extends Mod {
     private Seq<ModInfo> filteredMods = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private int currentPage = 0;
-    private int modsPerPage = 8;
+    private int modsPerPage = 6;
     private String searchQuery = "";
     private BaseDialog browserDialog;
     private Table modListContainer;
@@ -45,12 +45,14 @@ public class TestMod extends Mod {
     private TextField searchField;
     private Table paginationBar;
     private Color accentColor = Color.valueOf("84f491");
+    private Color bgDark = Color.valueOf("2b2f38");
+    private Color cardBg = Color.valueOf("363944");
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
 
     public TestMod() {
-        Log.info("ModInfo+ Enhanced Initializing");
+        Log.info("Helium Browser Initializing");
     }
 
     @Override
@@ -93,7 +95,7 @@ public class TestMod extends Mod {
     
     void addModInfoButton() {
         BaseDialog mods = Vars.ui.mods;
-        TextButton btn = new TextButton("@mod.browser");
+        TextButton btn = new TextButton("Enhanced Browser");
         btn.clicked(() -> showEnhancedBrowser());
         mods.buttons.add(btn).size(210f, 64f);
     }
@@ -103,13 +105,29 @@ public class TestMod extends Mod {
             browserDialog.show();
             return;
         }
-        browserDialog = new BaseDialog("Mod Browser");
-        browserDialog.addCloseButton();
+        browserDialog = new BaseDialog("");
+        browserDialog.cont.clear();
         
-        Table main = new Table(Tex.pane);
+        Table main = new Table();
+        main.background(Tex.pane);
+        
+        Table header = new Table();
+        header.background(Tex.button);
+        header.add("[accent]MOD BROWSER").style(Styles.outlineLabel).size(280f, 50f).left().padLeft(20f);
+        header.add().growX();
+        header.button(Icon.refresh, Styles.cleari, 40f, () -> {
+            reloadMods();
+        }).size(50f).tooltip("Refresh").padRight(10f);
+        header.button(Icon.cancel, Styles.cleari, 40f, () -> {
+            browserDialog.hide();
+        }).size(50f).tooltip("Close").padRight(10f);
+        main.add(header).fillX().height(60f).row();
+        
+        main.image().color(accentColor).fillX().height(3f).row();
         
         main.table(search -> {
-            search.image(Icon.zoom).size(32f).padRight(8f);
+            search.background(Tex.button);
+            search.image(Icon.zoom).size(32f).padLeft(15f).padRight(10f);
             searchField = new TextField();
             searchField.setMessageText("Search mods...");
             searchField.changed(() -> {
@@ -118,31 +136,33 @@ public class TestMod extends Mod {
                 applyFilter();
                 updateVisibleMods();
             });
-            search.add(searchField).growX().height(45f);
-            search.button(Icon.refresh, Styles.cleari, 40f, () -> {
+            search.add(searchField).growX().height(45f).pad(10f);
+            search.button(Icon.cancelSmall, Styles.cleari, 32f, () -> {
                 searchField.setText("");
                 searchQuery = "";
                 currentPage = 0;
-                reloadMods();
-            }).size(45f).padLeft(5f);
-        }).fillX().pad(10f).row();
+                applyFilter();
+                updateVisibleMods();
+            }).size(45f).padRight(10f).visible(() -> !searchField.getText().isEmpty());
+        }).fillX().height(65f).pad(10f).padBottom(5f).row();
         
         statusLabel = new Label("");
         main.add(statusLabel).pad(8f).row();
         
         modListContainer = new Table();
-        ScrollPane pane = new ScrollPane(modListContainer, Styles.smallPane);
+        ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
         pane.setScrollingDisabled(true, false);
-        main.add(pane).grow().padTop(5f).row();
+        pane.setOverscroll(false, false);
+        main.add(pane).grow().pad(10f).padTop(5f).row();
         
         paginationBar = new Table();
         buildPaginationBar();
-        main.add(paginationBar).fillX().padTop(10f).row();
+        main.add(paginationBar).fillX().row();
         
         main.button("Load Mods", Icon.download, () -> fetchModList()).size(250f, 55f).pad(10f);
         
-        browserDialog.cont.add(main).grow();
+        browserDialog.cont.add(main).size(900f, 750f);
         browserDialog.show();
         updateStatusLabel("Click Load Mods to browse");
     }
@@ -156,23 +176,26 @@ public class TestMod extends Mod {
     
     void buildPaginationBar() {
         paginationBar.clearChildren();
-        paginationBar.button("<", () -> {
+        paginationBar.background(Tex.button);
+        
+        paginationBar.button("<", Styles.cleart, () -> {
             if(currentPage > 0) {
                 currentPage--;
                 updateVisibleMods();
             }
-        }).size(60f, 50f).disabled(b -> currentPage == 0).padRight(10f);
+        }).size(80f, 50f).disabled(b -> currentPage == 0);
         
         paginationBar.add().growX();
-        paginationBar.label(() -> "Page " + (currentPage + 1) + " / " + Math.max(1, getMaxPage() + 1)).pad(5f);
+        paginationBar.label(() -> "[lightgray]Page " + (currentPage + 1) + " / " + Math.max(1, getMaxPage() + 1) + 
+                         "  |  " + filteredMods.size + " mods").pad(10f);
         paginationBar.add().growX();
         
-        paginationBar.button(">", () -> {
+        paginationBar.button(">", Styles.cleart, () -> {
             if(currentPage < getMaxPage()) {
                 currentPage++;
                 updateVisibleMods();
             }
-        }).size(60f, 50f).disabled(b -> currentPage >= getMaxPage()).padLeft(10f);
+        }).size(80f, 50f).disabled(b -> currentPage >= getMaxPage());
     }
     
     void applyFilter() {
@@ -196,13 +219,13 @@ public class TestMod extends Mod {
         int end = Math.min(start + modsPerPage, filteredMods.size);
         
         if(filteredMods.isEmpty()) {
-            modListContainer.add("[scarlet]No mods found").pad(30f);
+            modListContainer.add("[lightgray]No mods found").pad(40f);
         } else {
             for(int i = start; i < end; i++) {
                 buildModRow(modListContainer, filteredMods.get(i));
             }
         }
-        updateStatusLabel("Showing " + filteredMods.size + " mods");
+        updateStatusLabel("Showing " + (end - start) + " of " + filteredMods.size + " mods");
         buildPaginationBar();
     }
     
@@ -294,13 +317,14 @@ void buildModRow(Table table, ModInfo mod) {
     );
     
     table.table(Tex.button, row -> {
+        row.margin(12f);
         row.left();
         
         TextureRegion icon = getModIcon(mod, installed);
         if(icon != null) {
-            row.image(icon).size(64f).padLeft(10f).padRight(12f);
+            row.image(icon).size(70f).padRight(15f);
         } else {
-            row.image(Icon.box).size(64f).color(Color.gray).padLeft(10f).padRight(12f);
+            row.image(Icon.box).size(70f).color(Color.gray).padRight(15f);
         }
         
         row.table(info -> {
@@ -308,32 +332,37 @@ void buildModRow(Table table, ModInfo mod) {
             
             info.table(title -> {
                 title.left();
-                title.add("[accent]" + mod.name).style(Styles.outlineLabel).padRight(8f);
+                title.add(mod.name).style(Styles.outlineLabel).color(accentColor).padRight(8f);
                 
                 TextureRegion badge = getBadge(mod);
                 if(badge != null && badge.found()) {
-                    title.image(badge).size(28f, 18f).padRight(4f);
+                    title.image(badge).size(32f, 20f).padRight(6f);
                 } else {
-                    String badgeText = mod.hasJava ? "[#b07219][[JAVA]" : "[#f1e05a][[JS]";
-                    title.add(badgeText).style(Styles.outlineLabel);
+                    String badgeText = mod.hasJava ? "[#b07219]JAVA" : "[#f1e05a]JS";
+                    title.add(badgeText).style(Styles.outlineLabel).padRight(6f);
                 }
                 
                 if(mod.stars >= 10) {
                     title.add(" [yellow]\u2605" + mod.stars).padLeft(6f);
+                }
+                
+                if(installed != null) {
+                    title.image(Icon.ok).size(20f).color(Color.lime).padLeft(6f);
                 }
             }).row();
             
             info.add("[lightgray]by " + mod.author + " [gray]| v" + mod.version).padTop(4f).row();
             
             if(!mod.description.isEmpty()) {
-                Label desc = new Label(mod.description.length() > 80 ? 
-                    mod.description.substring(0, 77) + "..." : mod.description);
-                desc.setWrap(true);
-                desc.setColor(Color.lightGray);
-                info.add(desc).width(350f).padTop(4f).row();
+                String desc = mod.description.length() > 90 ? 
+                    mod.description.substring(0, 87) + "..." : mod.description;
+                Label descLabel = new Label(desc);
+                descLabel.setWrap(true);
+                descLabel.setColor(Color.lightGray);
+                info.add(descLabel).width(420f).padTop(6f).row();
             }
             
-        }).growX().pad(10f);
+        }).growX().padLeft(8f);
         
         row.table(btns -> {
             btns.defaults().size(50f);
@@ -355,7 +384,7 @@ void buildModRow(Table table, ModInfo mod) {
             }
         }).right().padRight(10f);
         
-    }).fillX().height(120f).pad(4f).row();
+    }).fillX().height(140f).pad(6f).row();
 }
 
 TextureRegion getModIcon(ModInfo mod, Mods.LoadedMod installed) {
@@ -391,65 +420,102 @@ void showModDetails(ModInfo mod) {
         (m.meta != null && m.meta.name != null && m.meta.name.equalsIgnoreCase(mod.name))
     );
     
-    BaseDialog dialog = new BaseDialog(mod.name);
-    dialog.addCloseButton();
+    BaseDialog dialog = new BaseDialog("");
     
-    Table content = new Table(Tex.pane);
-    content.margin(15f);
+    Table main = new Table(Tex.pane);
+    main.margin(25f);
+    
+    Table header = new Table();
+    header.background(Tex.button);
     
     TextureRegion icon = getModIcon(mod, installed);
     if(icon != null) {
-        content.image(icon).size(80f).pad(10f).row();
+        header.image(icon).size(96f).pad(15f);
     } else {
-        content.image(Icon.box).size(80f).color(Color.gray).pad(10f).row();
+        header.image(Icon.box).size(96f).color(Color.gray).pad(15f);
     }
     
-    Table titleRow = new Table();
-    titleRow.add("[accent]" + mod.name).pad(5f);
+    header.table(title -> {
+        title.left().defaults().left();
+        title.add("[accent]" + mod.name).style(Styles.outlineLabel).padBottom(5f).row();
+        title.add("[cyan]by " + mod.author).row();
+    }).growX().padLeft(15f);
+    
+    main.add(header).fillX().pad(10f).row();
+    
+    main.image().color(accentColor).height(4f).fillX().pad(10f).row();
+    
+    Table badges = new Table();
+    badges.left();
+    
     TextureRegion badge = getBadge(mod);
     if(badge != null && badge.found()) {
-        titleRow.image(badge).size(36f, 22f).padLeft(8f);
+        badges.image(badge).size(48f, 30f).padRight(10f);
     } else {
-        String badgeText = mod.hasJava ? " [#b07219][[JAVA]" : " [#f1e05a][[JS]";
-        titleRow.add(badgeText);
+        String badgeText = mod.hasJava ? "[#b07219][[JAVA]" : "[#f1e05a][[JS]";
+        badges.add(badgeText).style(Styles.outlineLabel).padRight(10f);
     }
-    content.add(titleRow).row();
     
-    content.add("[cyan]" + mod.author).pad(5f).row();
-    content.add("[lightgray]v" + mod.version).pad(3f).row();
-    content.add("[yellow]\u2605 " + mod.stars + " stars").pad(3f).row();
+    if(installed != null) {
+        badges.image(Icon.ok).size(28f).color(Color.lime).padRight(8f);
+        badges.add("[lime]Installed").style(Styles.outlineLabel);
+    }
+    
+    main.add(badges).left().pad(10f).row();
+    
+    Table info = new Table();
+    info.left().defaults().left().pad(5f);
+    
+    info.add("[lightgray]Version:").padRight(15f);
+    info.add("[white]" + mod.version).row();
+    
+    info.add("[lightgray]Repository:").padRight(15f);
+    info.add("[white]" + mod.repo).row();
+    
+    info.add("[lightgray]Stars:").padRight(15f);
+    info.add("[yellow]\u2605 " + mod.stars).row();
+    
+    main.add(info).left().fillX().pad(10f).row();
+    
+    main.image().color(accentColor).height(3f).fillX().pad(10f).row();
     
     if(!mod.description.isEmpty()) {
         Label desc = new Label(mod.description);
         desc.setWrap(true);
-        desc.setAlignment(Align.center);
         desc.setColor(Color.lightGray);
-        content.add(desc).width(450f).pad(10f).row();
+        desc.setAlignment(Align.left);
+        main.add(desc).width(500f).pad(15f).left().row();
+        main.image().color(accentColor).height(3f).fillX().pad(10f).row();
     }
-    
-    content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
     
     Table statsTable = new Table();
     statsTable.add("[cyan]Loading stats...").pad(15f);
-    content.add(statsTable).row();
+    main.add(statsTable).row();
     
-    content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
+    main.image().color(accentColor).height(3f).fillX().pad(10f).row();
     
-    content.table(actions -> {
-        actions.button("Open GitHub", Icon.link, () -> {
-            Core.app.openURI("https://github.com/" + mod.repo);
-        }).size(220f, 55f).pad(5f);
-        
-        if(installed == null) {
-            actions.button("Install", Icon.download, () -> {
-                installMod(mod);
-                dialog.hide();
-            }).size(220f, 55f).pad(5f);
-        }
-    }).row();
+    Table actions = new Table();
+    actions.defaults().size(240f, 55f).pad(8f);
     
-    ScrollPane pane = new ScrollPane(content);
-    dialog.cont.add(pane).grow();
+    actions.button("Open GitHub", Icon.link, () -> {
+        Core.app.openURI("https://github.com/" + mod.repo);
+    });
+    
+    if(installed == null) {
+        actions.button("Install", Icon.download, () -> {
+            installMod(mod);
+            dialog.hide();
+        });
+    }
+    
+    main.add(actions).fillX().pad(10f).row();
+    
+    main.button("Close", Icon.cancel, () -> {
+        dialog.hide();
+    }).size(200f, 50f).pad(10f);
+    
+    ScrollPane pane = new ScrollPane(main);
+    dialog.cont.add(pane).size(600f, 700f);
     dialog.show();
     
     loadGitHubStats(mod, statsTable);
