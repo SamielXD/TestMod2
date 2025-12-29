@@ -296,11 +296,10 @@ public class TestMod extends Mod {
         buildPaginationBar();
         main.add(paginationBar).fillX().padBottom(5f).row();
         
-        float width = isPortrait ? Core.graphics.getWidth() * 0.95f : 1000f;
-        float height = isPortrait ? Core.graphics.getHeight() * 0.9f : 800f;
+        float width = isPortrait ? Core.graphics.getWidth() : Core.graphics.getWidth();
+        float height = isPortrait ? Core.graphics.getHeight() : Core.graphics.getHeight();
         
         browserDialog.cont.add(main).size(width, height);
-        browserDialog.addCloseButton();
         browserDialog.show();
         fetchModList();
     }
@@ -579,11 +578,17 @@ public class TestMod extends Mod {
                 
                 info.table(title -> {
                     title.left();
-                    title.add(mod.name).style(Styles.outlineLabel).color(accentColor).padRight(10f);
+                    
+                    Label nameLabel = new Label(mod.name);
+                    nameLabel.setStyle(Styles.outlineLabel);
+                    nameLabel.setColor(accentColor);
+                    nameLabel.setEllipsis(true);
+                    nameLabel.setWrap(false);
+                    title.add(nameLabel).maxWidth(300f).padRight(10f);
                     
                     Table badges = new Table();
                     badges.left();
-                    badges.defaults().padRight(10f);
+                    badges.defaults().padRight(8f);
                     
                     if(mod.hasJava) {
                         if(javaBadge != null && javaBadge.found()) {
@@ -603,8 +608,13 @@ public class TestMod extends Mod {
                         }
                     }
                     
-                    Image hjsonImg = badges.image(Icon.book).size(20f).color(Color.valueOf("89e051")).get();
-                    hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format for metadata"));
+                    if(hjsonBadge != null && hjsonBadge.found()) {
+                        Image hjsonImg = badges.image(hjsonBadge).size(32f, 20f).get();
+                        hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
+                    } else {
+                        Image hjsonImg = badges.image(Icon.book).size(20f).color(Color.valueOf("89e051")).get();
+                        hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
+                    }
                     
                     if(installed != null) {
                         if(mod.isServerCompatible) {
@@ -623,7 +633,7 @@ public class TestMod extends Mod {
                     }
                     
                     title.add(badges).padLeft(8f);
-                }).row();
+                }).fillX().row();
                 
                 info.add("[lightgray]" + mod.author + " [gray]| v" + mod.version).padTop(6f).row();
                 
@@ -649,7 +659,7 @@ public class TestMod extends Mod {
             }).growX().padLeft(10f);
             
             row.table(btns -> {
-                btns.defaults().size(55f).pad(5f);
+                btns.defaults().size(60f).pad(5f);
                 
                 btns.button(Icon.info, Styles.clearNonei, () -> {
                     showModDetails(mod);
@@ -679,7 +689,7 @@ public class TestMod extends Mod {
                 
             }).right().padRight(12f);
             
-        }).fillX().height(130f).pad(8f).row();
+        }).fillX().minHeight(140f).pad(8f).row();
     }
 
     void toggleModState(ModInfo mod, Mods.LoadedMod installed) {
@@ -799,8 +809,13 @@ public class TestMod extends Mod {
             }
         }
         
-        Image hjsonImg = badges.image(Icon.book).size(28f).color(Color.valueOf("89e051")).get();
-        hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format for metadata configuration"));
+        if(hjsonBadge != null && hjsonBadge.found()) {
+            Image hjsonImg = badges.image(hjsonBadge).size(48f, 30f).get();
+            hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
+        } else {
+            Image hjsonImg = badges.image(Icon.book).size(28f).color(Color.valueOf("89e051")).get();
+            hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format for metadata configuration"));
+        }
         
         if(installed != null) {
             if(mod.isServerCompatible) {
