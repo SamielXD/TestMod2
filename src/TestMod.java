@@ -49,7 +49,10 @@ public class TestMod extends Mod {
     private Color cardBg = Color.valueOf("363944");
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
+    private TextureRegion jsonBadge;
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
+    private int currentTab = 0; // 0 = installed, 1 = browser
+    private String sortMode = "updated"; // updated, stars, name
 
     public TestMod() {
         Log.info("ModInfo+ Browser Initializing");
@@ -69,15 +72,13 @@ public class TestMod extends Mod {
     void loadBadges() {
         javaBadge = Core.atlas.find("testmod-java-badge");
         jsBadge = Core.atlas.find("testmod-js-badge");
+        jsonBadge = Core.atlas.find("testmod-json-badge");
         
-        if(!javaBadge.found()) {
-            javaBadge = Core.atlas.find("java-badge");
-        }
-        if(!jsBadge.found()) {
-            jsBadge = Core.atlas.find("js-badge");
-        }
+        if(!javaBadge.found()) javaBadge = Core.atlas.find("java-badge");
+        if(!jsBadge.found()) jsBadge = Core.atlas.find("js-badge");
+        if(!jsonBadge.found()) jsonBadge = Core.atlas.find("json-badge");
         
-        Log.info("Badges: Java=" + javaBadge.found() + " JS=" + jsBadge.found());
+        Log.info("Badges: Java=" + javaBadge.found() + " JS=" + jsBadge.found() + " JSON=" + jsonBadge.found());
     }
     
     void loadModIcons() {
@@ -95,17 +96,26 @@ public class TestMod extends Mod {
     
     // FIXED: Button now has icon and renamed to "ModInfo+"
     void addModInfoButton() {
-        BaseDialog mods = Vars.ui.mods;
-        TextButton btn = new TextButton("ModInfo+");
-        btn.getLabel().setFontScale(0.9f);
-        
-        // Add icon to button
-        btn.getCells().first().padLeft(8f);
-        btn.row();
-        btn.image(Icon.info).size(24f).padTop(-35f).padLeft(10f);
-        
-        btn.clicked(() -> showEnhancedBrowser());
-        mods.buttons.add(btn).size(210f, 64f);
+        Core.app.post(() -> {
+            try {
+                Element modsButton = Vars.ui.menufrag.getChildren().find(e -> 
+                    e instanceof TextButton && ((TextButton)e).getText().toString().toLowerCase().contains("mod")
+                );
+                
+                if(modsButton != null) {
+                    modsButton.clicked(() -> {
+                        showEnhancedBrowser();
+                    });
+                    Log.info("ModInfo+: Hijacked vanilla mods button");
+                }
+            } catch(Exception e) {
+                Log.err("Failed to hijack mods button", e);
+                BaseDialog mods = Vars.ui.mods;
+                TextButton btn = new TextButton("ModInfo+");
+                btn.clicked(() -> showEnhancedBrowser());
+                mods.buttons.add(btn).size(210f, 64f);
+            }
+        });
     }
     
     void showEnhancedBrowser() {
@@ -124,6 +134,19 @@ public class TestMod extends Mod {
         header.image(Icon.info).size(40f).padLeft(15f).padRight(10f);
         header.add("[accent]MODINFO+ BROWSER").style(Styles.outlineLabel).size(280f, 50f).left();
         header.add().growX();
+        
+        header.table(tabs -> {
+            tabs.defaults().size(120f, 50f).pad(5f);
+            tabs.button("Installed", Styles.togglet, () -> {
+                currentTab = 0;
+                fetchModList();
+            }).checked(b -> currentTab == 0);
+            tabs.button("Browse", Styles.togglet, () -> {
+                currentTab = 1;
+                fetchRemoteMods();
+            }).checked(b -> currentTab == 1);
+        }).padRight(10f);
+        
         header.button(Icon.refresh, Styles.cleari, 40f, () -> {
             reloadMods();
         }).size(50f).tooltip("Refresh").padRight(10f);
@@ -133,6 +156,24 @@ public class TestMod extends Mod {
         main.add(header).fillX().height(60f).row();
         
         main.image().color(accentColor).fillX().height(3f).row();
+        
+        main.table(sortBar -> {
+            sortBar.background(Tex.button);
+            sortBar.add("[lightgray]Sort: ").padLeft(15f).padRight(10f);
+            sortBar.defaults().size(110f, 45f).pad(5f);
+            sortBar.button("Updated", Styles.togglet, () -> {
+                sortMode = "updated";
+                applySort();
+            }).checked(b -> sortMode.equals("updated"));
+            sortBar.button("Stars", Styles.togglet, () -> {
+                sortMode = "stars";
+                applySort();
+            }).checked(b -> sortMode.equals("stars"));
+            sortBar.button("Name", Styles.togglet, () -> {
+                sortMode = "name";
+                applySort();
+            }).checked(b -> sortMode.equals("name"));
+        }).fillX().height(60f).pad(10f).padTop(5f).row();
         
         main.table(search -> {
             search.background(Tex.button);
@@ -169,7 +210,17 @@ public class TestMod extends Mod {
         buildPaginationBar();
         main.add(paginationBar).fillX().row();
         
-        main.button("Load Installed Mods", Icon.download, () -> fetchModList()).size(250f, 55f).pad(10f);
+        main.table(actions -> {
+            actions.defaults().size(200f, 55f).pad(10f);
+            actions.button("Load Installed", Icon.download, () -> {
+                currentTab = 0;
+                fetchModList();
+            });
+            actions.button("Browse Mods", Icon.zoom, () -> {
+                currentTab = 1;
+                fetchRemoteMods();
+            });
+        }).fillX().row();
         
         browserDialog.cont.add(main).size(900f, 750f);
         browserDialog.show();
@@ -180,7 +231,11 @@ public class TestMod extends Mod {
         allMods.clear();
         filteredMods.clear();
         statsCache.clear();
-        fetchModList();
+        if(currentTab == 0) {
+            fetchModList();
+        } else {
+            fetchRemoteMods();
+        }
     }
     
     void buildPaginationBar() {
@@ -220,6 +275,18 @@ public class TestMod extends Mod {
                 }
             }
         }
+        applySort();
+    }
+    
+    void applySort() {
+        if(sortMode.equals("updated")) {
+            filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
+        } else if(sortMode.equals("stars")) {
+            filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
+        } else {
+            filteredMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+        }
+        updateVisibleMods();
     }
     
     void updateVisibleMods() {
@@ -278,14 +345,50 @@ public class TestMod extends Mod {
             allMods.add(info);
         }
         
-        allMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
-        
         Core.app.post(() -> {
             currentPage = 0;
             applyFilter();
-            updateVisibleMods();
             updateStatusLabel("Loaded " + allMods.size + " installed mods");
         });
+    });
+}
+
+void fetchRemoteMods() {
+    updateStatusLabel("[cyan]Fetching mod browser...");
+    Core.app.post(() -> {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL("https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json").openConnection();
+            conn.setRequestProperty("User-Agent", "ModInfo+");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            
+            if(conn.getResponseCode() != 200) {
+                Core.app.post(() -> updateStatusLabel("[scarlet]Failed to fetch mods"));
+                return;
+            }
+            
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder json = new StringBuilder();
+            String line;
+            while((line = reader.readLine()) != null) json.append(line);
+            reader.close();
+            
+            Seq<ModInfo> mods = parseModList(json.toString());
+            Core.app.post(() -> {
+                allMods.clear();
+                allMods.addAll(mods);
+                currentPage = 0;
+                applyFilter();
+                updateStatusLabel("Loaded " + allMods.size + " mods from browser");
+            });
+            
+        } catch(Exception e) {
+            Log.err("Fetch mods", e);
+            Core.app.post(() -> updateStatusLabel("[scarlet]Network error"));
+        } finally {
+            if(conn != null) try { conn.disconnect(); } catch(Exception e) {}
+        }
     });
 }
 
@@ -352,14 +455,20 @@ void buildModRow(Table table, ModInfo mod) {
                     if(javaBadge != null && javaBadge.found()) {
                         badges.image(javaBadge).size(32f, 20f).padRight(6f);
                     } else {
-                        badges.add("[#b07219]JAVA").style(Styles.outlineLabel).padRight(6f);
+                        badges.image(Icon.units).size(20f).color(Color.valueOf("b07219")).padRight(4f);
                     }
                 } else if(mod.hasScripts) {
                     if(jsBadge != null && jsBadge.found()) {
                         badges.image(jsBadge).size(32f, 20f).padRight(6f);
                     } else {
-                        badges.add("[#f1e05a]JS").style(Styles.outlineLabel).padRight(6f);
+                        badges.image(Icon.file).size(20f).color(Color.valueOf("f1e05a")).padRight(4f);
                     }
+                }
+                
+                if(jsonBadge != null && jsonBadge.found()) {
+                    badges.image(jsonBadge).size(28f, 18f).padRight(6f);
+                } else {
+                    badges.image(Icon.settings).size(18f).color(Color.valueOf("89e051")).padRight(4f);
                 }
                 
                 if(installed != null) {
@@ -545,14 +654,20 @@ void installMod(ModInfo mod) {
         if(javaBadge != null && javaBadge.found()) {
             badges.image(javaBadge).size(48f, 30f).padRight(10f);
         } else {
-            badges.add("[#b07219][[JAVA]").style(Styles.outlineLabel).padRight(10f);
+            badges.image(Icon.units).size(28f).color(Color.valueOf("b07219")).padRight(8f);
         }
     } else if(mod.hasScripts) {
         if(jsBadge != null && jsBadge.found()) {
             badges.image(jsBadge).size(48f, 30f).padRight(10f);
         } else {
-            badges.add("[#f1e05a][[JS]").style(Styles.outlineLabel).padRight(10f);
+            badges.image(Icon.file).size(28f).color(Color.valueOf("f1e05a")).padRight(8f);
         }
+    }
+    
+    if(jsonBadge != null && jsonBadge.found()) {
+        badges.image(jsonBadge).size(42f, 26f).padRight(10f);
+    } else {
+        badges.image(Icon.settings).size(26f).color(Color.valueOf("89e051")).padRight(8f);
     }
     
     if(installed != null) {
