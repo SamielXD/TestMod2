@@ -216,7 +216,7 @@ public class TestMod extends Mod {
         updateStatusLabel("[cyan]Loading mods from GitHub...");
         Core.app.post(() -> {
             try {
-                String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
+                String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/refs/heads/master/mods.json";
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
