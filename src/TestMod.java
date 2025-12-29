@@ -97,28 +97,27 @@ public class TestMod extends Mod {
     // FIXED: Button now has icon and renamed to "ModInfo+"
     void addModInfoButton() {
         Events.on(ClientLoadEvent.class, event -> {
-            Core.app.post(() -> {
+            Time.runTask(60f, () -> {
                 try {
-                    Table menu = (Table)Vars.ui.menufrag.getClass().getDeclaredField("menu").get(Vars.ui.menufrag);
+                    java.lang.reflect.Field menuField = Vars.ui.menufrag.getClass().getDeclaredField("menu");
+                    menuField.setAccessible(true);
+                    Table menu = (Table)menuField.get(Vars.ui.menufrag);
+                    
                     for(Element child : menu.getChildren()) {
                         if(child instanceof TextButton) {
                             TextButton btn = (TextButton)child;
-                            if(btn.getText().toString().toLowerCase().contains("mod")) {
+                            String text = btn.getText().toString().toLowerCase();
+                            if(text.contains("mod")) {
                                 btn.clearListeners();
-                                btn.clicked(() -> {
-                                    showEnhancedBrowser();
-                                });
-                                Log.info("ModInfo+: Hijacked mods button successfully");
+                                btn.clicked(() -> showEnhancedBrowser());
+                                Log.info("ModInfo+: Successfully hijacked mods button!");
                                 return;
                             }
                         }
                     }
+                    Log.warn("ModInfo+: Could not find mods button");
                 } catch(Exception e) {
-                    Log.err("Failed to hijack mods button, using fallback", e);
-                    BaseDialog mods = Vars.ui.mods;
-                    TextButton btn = new TextButton("ModInfo+");
-                    btn.clicked(() -> showEnhancedBrowser());
-                    mods.buttons.add(btn).size(210f, 64f);
+                    Log.err("ModInfo+: Hijack failed", e);
                 }
             });
         });
@@ -140,6 +139,11 @@ public class TestMod extends Mod {
         header.image(Icon.info).size(40f).padLeft(15f).padRight(10f);
         header.add("[accent]MODINFO+ BROWSER").style(Styles.outlineLabel).size(280f, 50f).left();
         header.add().growX();
+        
+        header.label(() -> {
+            long elapsed = (Time.millis() - lastRefreshTime) / 1000;
+            return "[lightgray]Refreshed " + elapsed + "s ago";
+        }).padRight(15f).visible(() -> lastRefreshTime > 0);
         
         header.table(tabs -> {
             tabs.defaults().size(120f, 50f).pad(5f);
@@ -237,6 +241,7 @@ public class TestMod extends Mod {
         allMods.clear();
         filteredMods.clear();
         statsCache.clear();
+        lastRefreshTime = Time.millis();
         if(currentTab == 0) {
             fetchModList();
         } else {
@@ -459,31 +464,33 @@ void buildModRow(Table table, ModInfo mod) {
                 
                 if(mod.hasJava) {
                     if(javaBadge != null && javaBadge.found()) {
-                        badges.image(javaBadge).size(32f, 20f).padRight(6f);
+                        badges.image(javaBadge).size(24f, 16f).padRight(4f).clicked(() -> {
+                            Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code");
+                        });
                     } else {
-                        badges.image(Icon.units).size(20f).color(Color.valueOf("b07219")).padRight(4f);
+                        badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).clicked(() -> {
+                            Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code");
+                        });
                     }
                 } else if(mod.hasScripts) {
-                    if(jsBadge != null && jsBadge.found()) {
-                        badges.image(jsBadge).size(32f, 20f).padRight(6f);
-                    } else {
-                        badges.image(Icon.file).size(20f).color(Color.valueOf("f1e05a")).padRight(4f);
-                    }
+                    badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).clicked(() -> {
+                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts");
+                    });
                 }
                 
-                if(jsonBadge != null && jsonBadge.found()) {
-                    badges.image(jsonBadge).size(28f, 18f).padRight(6f);
-                } else {
-                    badges.image(Icon.settings).size(18f).color(Color.valueOf("89e051")).padRight(4f);
-                }
+                badges.image(Icon.book).size(16f).color(Color.valueOf("89e051")).padRight(4f).clicked(() -> {
+                    Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata");
+                });
                 
                 if(installed != null) {
                     if(mod.isServerCompatible) {
-                        badges.image(Icon.host).size(20f).color(Color.sky).padRight(6f);
-                        badges.add("[sky]Server").style(Styles.outlineLabel).padRight(6f);
+                        badges.image(Icon.host).size(16f).color(Color.sky).padRight(4f).clicked(() -> {
+                            Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer servers");
+                        });
                     } else {
-                        badges.image(Icon.players).size(20f).color(Color.orange).padRight(6f);
-                        badges.add("[orange]Client").style(Styles.outlineLabel).padRight(6f);
+                        badges.image(Icon.players).size(16f).color(Color.orange).padRight(4f).clicked(() -> {
+                            Vars.ui.showInfo("[accent]Client Only\n[lightgray]Single-player only");
+                        });
                     }
                 }
                 
@@ -495,22 +502,32 @@ void buildModRow(Table table, ModInfo mod) {
                 
                 if(installed != null) {
                     if(installed.enabled()) {
-                        title.image(Icon.ok).size(20f).color(Color.lime).padLeft(8f);
+                        title.image(Icon.ok).size(18f).color(Color.lime).padLeft(8f);
                     } else {
-                        title.image(Icon.cancel).size(20f).color(Color.scarlet).padLeft(8f);
+                        title.image(Icon.cancel).size(18f).color(Color.scarlet).padLeft(8f);
                     }
                 }
             }).row();
             
             info.add("[lightgray]by " + mod.author + " [gray]| v" + mod.version).padTop(4f).row();
             
-            if(!mod.description.isEmpty()) {
-                String desc = mod.description.length() > 90 ? 
-                    mod.description.substring(0, 87) + "..." : mod.description;
-                Label descLabel = new Label(desc);
-                descLabel.setWrap(true);
-                descLabel.setColor(Color.lightGray);
-                info.add(descLabel).width(420f).padTop(6f).row();
+            if(installed != null) {
+                info.table(stats -> {
+                    stats.left().defaults().left().padRight(10f);
+                    if(mod.stars > 0) {
+                        stats.add("[yellow]★ " + mod.stars);
+                    }
+                    if(mod.downloads > 0) {
+                        stats.add("[lime]↓ " + mod.downloads);
+                    }
+                    if(mod.releases > 0) {
+                        stats.add("[cyan]⚡ " + mod.releases);
+                    }
+                }).padTop(4f).row();
+                
+                if(!mod.repo.isEmpty()) {
+                    loadModStatsInline(mod, info);
+                }
             }
             
         }).growX().padLeft(8f);
@@ -520,22 +537,22 @@ void buildModRow(Table table, ModInfo mod) {
             
             btns.button(Icon.info, Styles.clearNonei, () -> {
                 showModDetails(mod);
-            }).tooltip("Details");
+            }).tooltip("Details").row();
             
             if(installed != null) {
                 btns.button(installed.enabled() ? Icon.cancel : Icon.ok, Styles.clearNonei, () -> {
                     toggleModState(mod, installed);
                 }).tooltip(installed.enabled() ? "Disable" : "Enable")
-                  .update(b -> b.getStyle().imageUpColor = installed.enabled() ? Color.orange : Color.lime);
+                  .update(b -> b.getStyle().imageUpColor = installed.enabled() ? Color.orange : Color.lime).row();
                 
                 btns.button(Icon.trash, Styles.clearNonei, () -> {
                     confirmDelete(mod, installed);
-                }).tooltip("Delete").update(b -> b.getStyle().imageUpColor = Color.scarlet);
+                }).tooltip("Delete").update(b -> b.getStyle().imageUpColor = Color.scarlet).row();
                 
             } else if(!mod.repo.isEmpty()) {
                 btns.button(Icon.download, Styles.clearNonei, () -> {
                     installMod(mod);
-                }).tooltip("Install").update(b -> b.getStyle().imageUpColor = Color.sky);
+                }).tooltip("Install").update(b -> b.getStyle().imageUpColor = Color.sky).row();
             }
             
             if(!mod.repo.isEmpty()) {
@@ -546,7 +563,7 @@ void buildModRow(Table table, ModInfo mod) {
             
         }).right().padRight(10f);
         
-    }).fillX().height(140f).pad(6f).row();
+    }).fillX().height(120f).pad(6f).row();
 }
 
 void toggleModState(ModInfo mod, Mods.LoadedMod installed) {
@@ -625,6 +642,29 @@ void installMod(ModInfo mod) {
         Log.err("Install error", e);
         Vars.ui.showErrorMessage("Install failed: " + e.getMessage());
     }
+}
+
+void loadModStatsInline(ModInfo mod, Table infoTable) {
+    if(mod.repo.isEmpty()) return;
+    
+    String key = mod.repo;
+    if(statsCache.containsKey(key)) {
+        ModStats stats = statsCache.get(key);
+        mod.stars = stats.stars;
+        mod.downloads = stats.downloads;
+        mod.releases = stats.releases;
+        return;
+    }
+    
+    fetchModStats(mod, stats -> {
+        if(stats != null) {
+            statsCache.put(key, stats);
+            mod.stars = stats.stars;
+            mod.downloads = stats.downloads;
+            mod.releases = stats.releases;
+            Core.app.post(() -> updateVisibleMods());
+        }
+    });
 }void showModDetails(ModInfo mod) {
     Mods.LoadedMod installed = mod.installedMod;
     
@@ -658,30 +698,34 @@ void installMod(ModInfo mod) {
     
     if(mod.hasJava) {
         if(javaBadge != null && javaBadge.found()) {
-            badges.image(javaBadge).size(48f, 30f).padRight(10f);
+            badges.image(javaBadge).size(40f, 26f).padRight(10f).clicked(() -> {
+                Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code");
+            });
         } else {
-            badges.image(Icon.units).size(28f).color(Color.valueOf("b07219")).padRight(8f);
+            badges.add("[white]JAVA").style(Styles.outlineLabel).padRight(10f).clicked(() -> {
+                Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code");
+            });
         }
     } else if(mod.hasScripts) {
-        if(jsBadge != null && jsBadge.found()) {
-            badges.image(jsBadge).size(48f, 30f).padRight(10f);
-        } else {
-            badges.image(Icon.file).size(28f).color(Color.valueOf("f1e05a")).padRight(8f);
-        }
+        badges.add("[white]JS").style(Styles.outlineLabel).padRight(10f).clicked(() -> {
+            Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript");
+        });
     }
     
-    if(jsonBadge != null && jsonBadge.found()) {
-        badges.image(jsonBadge).size(42f, 26f).padRight(10f);
-    } else {
-        badges.image(Icon.settings).size(26f).color(Color.valueOf("89e051")).padRight(8f);
-    }
+    badges.image(Icon.book).size(24f).color(Color.valueOf("89e051")).padRight(10f).clicked(() -> {
+        Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata");
+    });
     
     if(installed != null) {
         if(mod.isServerCompatible) {
-            badges.image(Icon.host).size(28f).color(Color.sky).padRight(8f);
+            badges.image(Icon.host).size(24f).color(Color.sky).padRight(8f).clicked(() -> {
+                Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers");
+            });
             badges.add("[sky]Server Compatible").style(Styles.outlineLabel).padRight(10f);
         } else {
-            badges.image(Icon.players).size(28f).color(Color.orange).padRight(8f);
+            badges.image(Icon.players).size(24f).color(Color.orange).padRight(8f).clicked(() -> {
+                Vars.ui.showInfo("[accent]Client Only\n[lightgray]This mod only works in singleplayer");
+            });
             badges.add("[orange]Client Only").style(Styles.outlineLabel).padRight(10f);
         }
     }
@@ -725,6 +769,7 @@ void installMod(ModInfo mod) {
     main.image().color(accentColor).height(3f).fillX().pad(10f).row();
     
     if(!mod.description.isEmpty()) {
+        main.add("[accent]Description:").left().padLeft(15f).padTop(10f).row();
         Label desc = new Label(mod.description);
         desc.setWrap(true);
         desc.setColor(Color.lightGray);
@@ -914,6 +959,8 @@ void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
         String version = "";
         String lastUpdated = "";
         int stars = 0;
+        int downloads = 0;
+        int releases = 0;
         boolean hasJava = false;
         boolean hasScripts = false;
         boolean isServerCompatible = false;
