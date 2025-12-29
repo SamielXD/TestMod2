@@ -244,28 +244,27 @@ public class TestMod extends Mod {
             ModInfo info = new ModInfo();
             
             if(mod.meta != null) {
-                info.name = mod.meta.displayName();
+                info.name = mod.meta.name;
                 info.author = mod.meta.author;
                 info.description = mod.meta.description;
                 info.version = mod.meta.version;
-                info.repo = mod.repo != null ? mod.repo : "";
             } else {
                 info.name = mod.name;
                 info.author = "Unknown";
                 info.description = "";
                 info.version = "1.0";
-                info.repo = "";
             }
             
+            info.repo = "";
             info.hasJava = mod.main != null;
-            info.hasScripts = mod.hasScripts();
+            info.hasScripts = mod.scripts != null && mod.scripts.size > 0;
             info.stars = 0;
             info.lastUpdated = "";
             
             allMods.add(info);
         }
         
-        allMods.sort(m -> m.name);
+        allMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
         
         Core.app.post(() -> {
             currentPage = 0;
@@ -520,7 +519,7 @@ void showModDetails(ModInfo mod) {
     ScrollPane pane = new ScrollPane(main);
     dialog.cont.add(pane).size(600f, 700f);
     dialog.show();
-                    }void loadGitHubStats(ModInfo mod, Table statsTable) {
+}void loadGitHubStats(ModInfo mod, Table statsTable) {
         String key = mod.repo;
         if(statsCache.containsKey(key)) {
             displayStats(statsTable, mod, statsCache.get(key));
@@ -668,4 +667,4 @@ void showModDetails(ModInfo mod) {
         int releases = 0;
         int stars = 0;
     }
-        }
+}
