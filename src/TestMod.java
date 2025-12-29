@@ -139,72 +139,105 @@ public class TestMod extends Mod {
         browserDialog = new BaseDialog("");
         browserDialog.cont.clear();
         
+        boolean isPortrait = Core.graphics.getHeight() > Core.graphics.getWidth();
+        
         Table main = new Table();
         main.background(Tex.pane);
         
         Table header = new Table();
         header.background(Tex.buttonEdge3);
         
-        header.table(left -> {
-            left.image(Icon.box).size(48f).color(accentColor).pad(10f);
-            left.add("[accent]MODINFO+").style(Styles.outlineLabel).growX().left().padLeft(10f);
-        }).growX().left();
+        if(isPortrait) {
+            header.table(top -> {
+                top.image(Icon.box).size(40f).color(accentColor).pad(8f);
+                top.add("[accent]MODINFO+").style(Styles.outlineLabel).growX().left().padLeft(8f);
+                top.button(Icon.cancel, Styles.cleari, () -> browserDialog.hide()).size(40f).pad(5f);
+            }).fillX().row();
+            
+            header.table(tabs -> {
+                tabs.defaults().height(40f).growX().pad(3f);
+                tabs.button("Installed", Styles.togglet, () -> {
+                    currentTab = 0;
+                    fetchModList();
+                }).checked(b -> currentTab == 0);
+                tabs.button("Browse", Styles.togglet, () -> {
+                    currentTab = 1;
+                    fetchRemoteMods();
+                }).checked(b -> currentTab == 1);
+            }).fillX().padBottom(5f);
+        } else {
+            header.table(left -> {
+                left.image(Icon.box).size(48f).color(accentColor).pad(10f);
+                left.add("[accent]MODINFO+").style(Styles.outlineLabel).growX().left().padLeft(10f);
+            }).growX().left();
+            
+            header.table(tabs -> {
+                tabs.defaults().size(100f, 45f).pad(3f);
+                tabs.button("Installed", Styles.togglet, () -> {
+                    currentTab = 0;
+                    fetchModList();
+                }).checked(b -> currentTab == 0);
+                tabs.button("Browse", Styles.togglet, () -> {
+                    currentTab = 1;
+                    fetchRemoteMods();
+                }).checked(b -> currentTab == 1);
+            }).padRight(5f);
+            
+            header.button(Icon.refresh, Styles.cleari, () -> reloadMods()).size(45f).tooltip("Refresh").pad(5f);
+            header.button(Icon.cancel, Styles.cleari, () -> browserDialog.hide()).size(45f).tooltip("Close").pad(5f);
+        }
         
-        header.table(tabs -> {
-            tabs.defaults().size(100f, 45f).pad(3f);
-            tabs.button("Installed", Styles.togglet, () -> {
-                currentTab = 0;
-                fetchModList();
-            }).checked(b -> currentTab == 0);
-            tabs.button("Browse", Styles.togglet, () -> {
-                currentTab = 1;
-                fetchRemoteMods();
-            }).checked(b -> currentTab == 1);
-        }).padRight(5f);
-        
-        header.button(Icon.refresh, Styles.cleari, () -> {
-            reloadMods();
-        }).size(45f).tooltip("Refresh").pad(5f);
-        
-        header.button(Icon.cancel, Styles.cleari, () -> {
-            browserDialog.hide();
-        }).size(45f).tooltip("Close").pad(5f);
-        
-        main.add(header).fillX().height(65f).row();
+        main.add(header).fillX().row();
         
         main.image().color(accentColor).fillX().height(2f).row();
         
-        main.table(controls -> {
-            controls.background(Tex.button);
-            
-            controls.table(sortBar -> {
-                sortBar.add("[lightgray]Sort:").padRight(8f);
-                sortBar.defaults().size(90f, 40f).pad(3f);
-                sortBar.button("Recent", Styles.togglet, () -> {
+        if(isPortrait) {
+            main.table(controls -> {
+                controls.background(Tex.button);
+                controls.button(Icon.refresh, Styles.cleari, () -> reloadMods()).size(40f).pad(5f);
+                controls.defaults().height(38f).growX().pad(2f);
+                controls.button("Recent", Styles.togglet, () -> {
                     sortMode = "updated";
                     applySort();
                 }).checked(b -> sortMode.equals("updated"));
-                sortBar.button("Stars", Styles.togglet, () -> {
+                controls.button("Stars", Styles.togglet, () -> {
                     sortMode = "stars";
                     applySort();
                 }).checked(b -> sortMode.equals("stars"));
-                sortBar.button("Name", Styles.togglet, () -> {
+                controls.button("Name", Styles.togglet, () -> {
                     sortMode = "name";
                     applySort();
                 }).checked(b -> sortMode.equals("name"));
-            }).left().padLeft(10f);
-            
-            controls.add().growX();
-            
-            controls.label(() -> {
-                if(lastRefreshTime > 0) {
-                    long elapsed = (Time.millis() - lastRefreshTime) / 1000;
-                    return "[lightgray]" + elapsed + "s ago";
-                }
-                return "";
-            }).padRight(10f);
-            
-        }).fillX().height(55f).row();
+            }).fillX().height(50f).row();
+        } else {
+            main.table(controls -> {
+                controls.background(Tex.button);
+                controls.table(sortBar -> {
+                    sortBar.add("[lightgray]Sort:").padRight(8f);
+                    sortBar.defaults().size(90f, 40f).pad(3f);
+                    sortBar.button("Recent", Styles.togglet, () -> {
+                        sortMode = "updated";
+                        applySort();
+                    }).checked(b -> sortMode.equals("updated"));
+                    sortBar.button("Stars", Styles.togglet, () -> {
+                        sortMode = "stars";
+                        applySort();
+                    }).checked(b -> sortMode.equals("stars"));
+                    sortBar.button("Name", Styles.togglet, () -> {
+                        sortMode = "name";
+                        applySort();
+                    }).checked(b -> sortMode.equals("name"));
+                }).left().padLeft(10f);
+                controls.add().growX();
+                controls.label(() -> {
+                    if(lastRefreshTime > 0) {
+                        long elapsed = (Time.millis() - lastRefreshTime) / 1000;
+                        return "[lightgray]" + elapsed + "s ago";
+                    }
+                    return "";
+                }).padRight(10f);
+            }).fillX().height(55f).row();
+        }
         
         main.table(search -> {
             search.background(Tex.button);
@@ -239,7 +272,11 @@ public class TestMod extends Mod {
         buildPaginationBar();
         main.add(paginationBar).fillX().padBottom(5f).row();
         
-        browserDialog.cont.add(main).size(1000f, 800f);
+        float width = isPortrait ? Core.graphics.getWidth() * 0.95f : 1000f;
+        float height = isPortrait ? Core.graphics.getHeight() * 0.9f : 800f;
+        
+        browserDialog.cont.add(main).size(width, height);
+        browserDialog.addCloseButton();
         browserDialog.show();
         fetchModList();
     }
@@ -331,6 +368,7 @@ public class TestMod extends Mod {
         return Math.max(0, (filteredMods.size - 1) / modsPerPage);
     }void fetchModList() {
     updateStatusLabel("[cyan]Loading installed mods...");
+    lastRefreshTime = Time.millis();
     Core.app.post(() -> {
         allMods.clear();
         
@@ -468,38 +506,35 @@ void buildModRow(Table table, ModInfo mod) {
                 
                 Table badges = new Table();
                 badges.left();
+                badges.defaults().padRight(8f);
                 
                 if(mod.hasJava) {
                     if(javaBadge != null && javaBadge.found()) {
-                        Image img = badges.image(javaBadge).size(24f, 16f).padRight(4f).get();
+                        Image img = badges.image(javaBadge).size(24f, 16f).get();
                         img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                     } else {
-                        Label lbl = badges.add("[white]JAVA").style(Styles.outlineLabel).padRight(4f).get();
+                        Label lbl = badges.add("[white]JAVA").style(Styles.outlineLabel).get();
                         lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                     }
                 } else if(mod.hasScripts) {
-                    Label lbl = badges.add("[white]JS").style(Styles.outlineLabel).padRight(4f).get();
+                    Label lbl = badges.add("[white]JS").style(Styles.outlineLabel).get();
                     lbl.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts"));
                 }
                 
-                Image jsonImg = badges.image(Icon.book).size(16f).color(Color.valueOf("89e051")).padRight(4f).get();
+                Image jsonImg = badges.image(Icon.book).size(16f).color(Color.valueOf("89e051")).get();
                 jsonImg.clicked(() -> Vars.ui.showInfo("[accent]Configuration\n[lightgray]Uses mod.hjson for metadata"));
                 
                 if(installed != null) {
                     if(mod.isServerCompatible) {
-                        Image hostImg = badges.image(Icon.host).size(16f).color(Color.sky).padRight(4f).get();
+                        Image hostImg = badges.image(Icon.host).size(16f).color(Color.sky).get();
                         hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer servers"));
                     } else {
-                        Image clientImg = badges.image(Icon.players).size(16f).color(Color.orange).padRight(4f).get();
+                        Image clientImg = badges.image(Icon.players).size(16f).color(Color.orange).get();
                         clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]Single-player only"));
                     }
                 }
                 
                 title.add(badges).padLeft(6f);
-                
-                if(mod.stars >= 10) {
-                    title.add(" [yellow]★" + mod.stars).padLeft(8f);
-                }
                 
                 if(installed != null) {
                     if(installed.enabled()) {
@@ -512,24 +547,21 @@ void buildModRow(Table table, ModInfo mod) {
             
             info.add("[lightgray]by " + mod.author + " [gray]| v" + mod.version).padTop(4f).row();
             
-            if(installed != null) {
-                info.table(stats -> {
-                    stats.left().defaults().left().padRight(10f);
-                    if(mod.stars > 0) {
-                        stats.add("[yellow]★ " + mod.stars);
-                    }
-                    if(mod.downloads > 0) {
-                        stats.add("[lime]↓ " + mod.downloads);
-                    }
-                    if(mod.releases > 0) {
-                        stats.add("[cyan]⚡ " + mod.releases);
-                    }
-                }).padTop(4f).row();
-                
-                if(!mod.repo.isEmpty()) {
-                    loadModStatsInline(mod, info);
+            info.table(stats -> {
+                stats.left().defaults().left().padRight(12f);
+                if(mod.stars > 0) {
+                    stats.image(Icon.star).size(16f).color(Color.yellow).padRight(4f);
+                    stats.add("[yellow]" + mod.stars).padRight(12f);
                 }
-            }
+                if(mod.downloads > 0) {
+                    stats.image(Icon.download).size(16f).color(Color.lime).padRight(4f);
+                    stats.add("[lime]" + mod.downloads).padRight(12f);
+                }
+                if(mod.releases > 0) {
+                    stats.image(Icon.box).size(16f).color(Color.cyan).padRight(4f);
+                    stats.add("[cyan]" + mod.releases);
+                }
+            }).padTop(4f).row();
             
         }).growX().padLeft(8f);
         
@@ -646,26 +678,7 @@ void installMod(ModInfo mod) {
 }
 
 void loadModStatsInline(ModInfo mod, Table infoTable) {
-    if(mod.repo.isEmpty()) return;
-    
-    String key = mod.repo;
-    if(statsCache.containsKey(key)) {
-        ModStats stats = statsCache.get(key);
-        mod.stars = stats.stars;
-        mod.downloads = stats.downloads;
-        mod.releases = stats.releases;
-        return;
-    }
-    
-    fetchModStats(mod, stats -> {
-        if(stats != null) {
-            statsCache.put(key, stats);
-            mod.stars = stats.stars;
-            mod.downloads = stats.downloads;
-            mod.releases = stats.releases;
-            Core.app.post(() -> updateVisibleMods());
-        }
-    });
+    // Don't auto-load stats to avoid rate limiting - only load on details view
 }void showModDetails(ModInfo mod) {
     Mods.LoadedMod installed = mod.installedMod;
     
