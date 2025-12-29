@@ -434,4 +434,152 @@ public class TestMod extends Mod {
         dialog.show();
         
         loadGitHubStats(mod, statsTable);
+    }void loadGitHubStats(ModInfo mod, Table statsTable) {
+        String key = mod.repo;
+        if(statsCache.containsKey(key)) {
+            displayStats(statsTable, mod, statsCache.get(key));
+            return;
+        }
+        
+        fetchModStats(mod, stats -> {
+            if(stats != null) {
+                statsCache.put(key, stats);
+                displayStats(statsTable, mod, stats);
+            } else {
+                displayStatsError(statsTable, mod);
+            }
+        });
     }
+    
+    void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
+        Core.app.post(() -> {
+            statsTable.clearChildren();
+            statsTable.defaults().left().pad(6f);
+            
+            statsTable.add("[yellow]\u2605 Stars:").padRight(15f);
+            statsTable.add("[white]" + stats.stars).row();
+            
+            statsTable.add("[lime]\u2193 Downloads:").padRight(15f);
+            statsTable.add("[white]" + stats.downloads).row();
+            
+            statsTable.add("[cyan]\u26A1 Releases:").padRight(15f);
+            statsTable.add("[white]" + stats.releases).row();
+            
+            statsTable.add("[lightgray]Updated:").padRight(15f);
+            statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
+        });
+    }
+    
+    void displayStatsError(Table statsTable, ModInfo mod) {
+        Core.app.post(() -> {
+            statsTable.clearChildren();
+            statsTable.defaults().left().pad(6f);
+            
+            statsTable.add("[scarlet]Stats unavailable").colspan(2).row();
+            statsTable.add("[lightgray]Updated:").padRight(15f);
+            statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
+        });
+    }
+    
+    void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
+        Core.app.post(() -> {
+            HttpURLConnection repoConn = null;
+            HttpURLConnection relConn = null;
+            try {
+                String repoUrl = mod.repo;
+                String[] parts = repoUrl.split("/");
+                if(parts.length < 2) {
+                    callback.get(null);
+                    return;
+                }
+                
+                String owner = parts[0];
+                String repo = parts[1];
+                
+                repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
+                repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+                repoConn.setRequestProperty("Authorization", "Bearer " + TOKEN);
+                repoConn.setConnectTimeout(10000);
+                repoConn.setReadTimeout(10000);
+                
+                if(repoConn.getResponseCode() != 200) {
+                    callback.get(null);
+                    return;
+                }
+                
+                BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
+                StringBuilder repoData = new StringBuilder();
+                String line;
+                while((line = repoReader.readLine()) != null) repoData.append(line);
+                repoReader.close();
+                
+                ModStats stats = new ModStats();
+                
+                try {
+                    JsonValue repoJson = new JsonReader().parse(repoData.toString());
+                    stats.stars = repoJson.getInt("stargazers_count", 0);
+                } catch(Exception e) {
+                    Log.err("Parse repo", e);
+                }
+                
+                try {
+                    relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
+                    relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+                    relConn.setRequestProperty("Authorization", "Bearer " + TOKEN);
+                    relConn.setConnectTimeout(10000);
+                    relConn.setReadTimeout(10000);
+                    
+                    if(relConn.getResponseCode() == 200) {
+                        BufferedReader relReader = new BufferedReader(new InputStreamReader(relConn.getInputStream()));
+                        StringBuilder relData = new StringBuilder();
+                        while((line = relReader.readLine()) != null) relData.append(line);
+                        relReader.close();
+                        
+                        JsonValue releasesJson = new JsonReader().parse(relData.toString());
+                        stats.releases = releasesJson.size;
+                        
+                        int totalDownloads = 0;
+                        for(JsonValue release : releasesJson) {
+                            JsonValue assets = release.get("assets");
+                            if(assets != null) {
+                                for(JsonValue asset : assets) {
+                                    totalDownloads += asset.getInt("download_count", 0);
+                                }
+                            }
+                        }
+                        stats.downloads = totalDownloads;
+                    }
+                } catch(Exception e) {
+                    Log.err("Parse releases", e);
+                }
+                
+                callback.get(stats);
+                
+            } catch(Exception e) {
+                Log.err("GitHub API", e);
+                callback.get(null);
+            } finally {
+                if(repoConn != null) try { repoConn.disconnect(); } catch(Exception e) {}
+                if(relConn != null) try { relConn.disconnect(); } catch(Exception e) {}
+            }
+        });
+    }
+    
+    class ModInfo {
+        String repo = "";
+        String name = "";
+        String author = "";
+        String description = "";
+        String version = "";
+        String lastUpdated = "";
+        int stars = 0;
+        boolean hasJava = false;
+        boolean hasScripts = false;
+    }
+    
+    class ModStats {
+        int downloads = 0;
+        int releases = 0;
+        int stars = 0;
+    }
+}
