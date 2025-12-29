@@ -97,7 +97,7 @@ public class TestMod extends Mod {
     
     void addModInfoButton() {
         Events.on(ClientLoadEvent.class, event -> {
-            Time.runTask(6f, () -> { // ⬅ 0.1s inject
+            Time.runTask(6f, () -> { // CHANGED: was 120f
                 try {
                     java.lang.reflect.Field menuField = Vars.ui.menufrag.getClass().getDeclaredField("menu");
                     menuField.setAccessible(true);
@@ -110,7 +110,9 @@ public class TestMod extends Mod {
                             String text = btn.getText().toString().toLowerCase();
                             if(text.contains("mod")) {
                                 btn.getListeners().clear();
-                                btn.clicked(() -> showEnhancedBrowser());
+                                btn.clicked(() -> {
+                                    showEnhancedBrowser();
+                                });
                                 found = true;
                                 Log.info("ModInfo+: Successfully hijacked mods button!");
                                 break;
@@ -119,12 +121,14 @@ public class TestMod extends Mod {
                     }
                     
                     if(!found) {
+                        Log.warn("ModInfo+: Could not find mods button, adding fallback");
                         Vars.ui.mods.shown(() -> {
                             Vars.ui.mods.hide();
                             showEnhancedBrowser();
                         });
                     }
                 } catch(Exception e) {
+                    Log.err("ModInfo+: Hijack failed", e);
                     Vars.ui.mods.shown(() -> {
                         Vars.ui.mods.hide();
                         showEnhancedBrowser();
@@ -147,31 +151,192 @@ public class TestMod extends Mod {
         
         Table header = new Table();
         header.background(Tex.button);
-        header.image(Icon.info).size(32f).padLeft(15f).padRight(10f);
-        header.add("[accent]MODINFO+ BROWSER").style(Styles.outlineLabel).size(240f, 44f).left();
+        header.image(Icon.info).size(40f).padLeft(15f).padRight(10f);
+        header.add("[accent]MODINFO+ BROWSER").style(Styles.outlineLabel).size(280f, 50f).left();
         header.add().growX();
         
-        header.button(Icon.cancel, Styles.cleari, 40f, () -> browserDialog.hide()).size(45f);
-        main.add(header).fillX().height(55f).row();
+        header.label(() -> {
+            long elapsed = (Time.millis() - lastRefreshTime) / 1000;
+            return "[lightgray]Refreshed " + elapsed + "s ago";
+        }).padRight(15f).visible(() -> lastRefreshTime > 0);
+        
+        header.table(tabs -> {
+            tabs.defaults().size(120f, 50f).pad(5f);
+            tabs.button("Installed", Styles.togglet, () -> {
+                currentTab = 0;
+                fetchModList();
+            }).checked(b -> currentTab == 0);
+            tabs.button("Browse", Styles.togglet, () -> {
+                currentTab = 1;
+                fetchRemoteMods();
+            }).checked(b -> currentTab == 1);
+        }).padRight(10f);
+        
+        header.button(Icon.refresh, Styles.cleari, 40f, () -> {
+            reloadMods();
+        }).size(50f).tooltip("Refresh").padRight(10f);
+        header.button(Icon.cancel, Styles.cleari, 40f, () -> {
+            browserDialog.hide();
+        }).size(50f).tooltip("Close").padRight(10f);
+        main.add(header).fillX().height(60f).row();
+        
+        main.image().color(accentColor).fillX().height(3f).row();
+        
+        main.table(sortBar -> {
+            sortBar.background(Tex.button);
+            sortBar.add("[lightgray]Sort: ").padLeft(15f).padRight(10f);
+            sortBar.defaults().size(110f, 45f).pad(5f);
+            sortBar.button("Updated", Styles.togglet, () -> {
+                sortMode = "updated";
+                applySort();
+            }).checked(b -> sortMode.equals("updated"));
+            sortBar.button("Stars", Styles.togglet, () -> {
+                sortMode = "stars";
+                applySort();
+            }).checked(b -> sortMode.equals("stars"));
+            sortBar.button("Name", Styles.togglet, () -> {
+                sortMode = "name";
+                applySort();
+            }).checked(b -> sortMode.equals("name"));
+        }).fillX().height(60f).pad(10f).padTop(5f).row();
+        
+        main.table(search -> {
+            search.background(Tex.button);
+            search.image(Icon.zoom).size(32f).padLeft(15f).padRight(10f);
+            searchField = new TextField();
+            searchField.setMessageText("Search mods...");
+            searchField.changed(() -> {
+                searchQuery = searchField.getText().toLowerCase();
+                currentPage = 0;
+                applyFilter();
+                updateVisibleMods();
+            });
+            search.add(searchField).growX().height(45f).pad(10f);
+            search.button(Icon.cancelSmall, Styles.cleari, 32f, () -> {
+                searchField.setText("");
+                searchQuery = "";
+                currentPage = 0;
+                applyFilter();
+                updateVisibleMods();
+            }).size(45f).padRight(10f).visible(() -> !searchField.getText().isEmpty());
+        }).fillX().height(65f).pad(10f).padBottom(5f).row();
+        
+        statusLabel = new Label("");
+        main.add(statusLabel).pad(8f).row();
         
         modListContainer = new Table();
         ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
-        main.add(pane).grow().pad(10f).row();
+        pane.setScrollingDisabled(true, false);
+        pane.setOverscroll(false, false);
+        main.add(pane).grow().pad(10f).padTop(5f).row();
         
         paginationBar = new Table();
         buildPaginationBar();
         main.add(paginationBar).fillX().row();
         
-        browserDialog.cont.add(main).size(900f, 700f); // ⬅ smaller
+        main.table(actions -> {
+            actions.defaults().size(200f, 55f).pad(10f);
+            actions.button("Load Installed", Icon.download, () -> {
+                currentTab = 0;
+                fetchModList();
+            });
+            actions.button("Browse Mods", Icon.zoom, () -> {
+                currentTab = 1;
+                fetchRemoteMods();
+            });
+        }).fillX().row();
+        
+        browserDialog.cont.add(main).size(900f, 700f); // CHANGED: was 1100f, 850f
         browserDialog.show();
+        updateStatusLabel("Click Load to browse mods");
+    }
+    
+    void reloadMods() {
+        allMods.clear();
+        filteredMods.clear();
+        statsCache.clear();
+        lastRefreshTime = Time.millis();
+        if(currentTab == 0) {
+            fetchModList();
+        } else {
+            fetchRemoteMods();
+        }
     }
     
     void buildPaginationBar() {
         paginationBar.clearChildren();
-        paginationBar.button("<", () -> {}).size(70f, 45f);
-        paginationBar.add("[lightgray]Page").pad(10f);
-        paginationBar.button(">", () -> {}).size(70f, 45f);
+        paginationBar.background(Tex.button);
+        
+        paginationBar.button("<", Styles.cleart, () -> {
+            if(currentPage > 0) {
+                currentPage--;
+                updateVisibleMods();
+            }
+        }).size(80f, 50f).disabled(b -> currentPage == 0);
+        
+        paginationBar.add().growX();
+        paginationBar.label(() -> "[lightgray]Page " + (currentPage + 1) + " / " + Math.max(1, getMaxPage() + 1) + 
+                         "  |  " + filteredMods.size + " mods").pad(10f);
+        paginationBar.add().growX();
+        
+        paginationBar.button(">", Styles.cleart, () -> {
+            if(currentPage < getMaxPage()) {
+                currentPage++;
+                updateVisibleMods();
+            }
+        }).size(80f, 50f).disabled(b -> currentPage >= getMaxPage());
+    }
+    
+    void applyFilter() {
+        filteredMods.clear();
+        if(searchQuery.isEmpty()) {
+            filteredMods.addAll(allMods);
+        } else {
+            for(ModInfo mod : allMods) {
+                if(mod.name.toLowerCase().contains(searchQuery) || 
+                    mod.author.toLowerCase().contains(searchQuery) ||
+                    mod.description.toLowerCase().contains(searchQuery)) {
+                    filteredMods.add(mod);
+                }
+            }
+        }
+        applySort();
+    }
+    
+    void applySort() {
+        if(sortMode.equals("updated")) {
+            filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
+        } else if(sortMode.equals("stars")) {
+            filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
+        } else {
+            filteredMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+        }
+        updateVisibleMods();
+    }
+    
+    void updateVisibleMods() {
+        modListContainer.clearChildren();
+        int start = currentPage * modsPerPage;
+        int end = Math.min(start + modsPerPage, filteredMods.size);
+        
+        if(filteredMods.isEmpty()) {
+            modListContainer.add("[lightgray]No mods found").pad(40f);
+        } else {
+            for(int i = start; i < end; i++) {
+                buildModRow(modListContainer, filteredMods.get(i));
+            }
+        }
+        updateStatusLabel("Showing " + (end - start) + " of " + filteredMods.size + " mods");
+        buildPaginationBar();
+    }
+    
+    void updateStatusLabel(String text) {
+        statusLabel.setText("[lightgray]" + text);
+    }
+    
+    int getMaxPage() {
+        return Math.max(0, (filteredMods.size - 1) / modsPerPage);
     }
 }void fetchModList() {
     updateStatusLabel("[cyan]Loading installed mods...");
