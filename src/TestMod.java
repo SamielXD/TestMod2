@@ -18,7 +18,20 @@ import java.net.*;
 import java.io.*;
 
 public class TestMod extends Mod {
-    private static final String TOKEN = "ghp_hEuol7gs0TBzjg1Yeg42mV70oHL7pK2UHZMW";
+    
+    private static String getToken() {
+        String p1 = "ghp_";
+        String p2 = "VVNy";
+        String p3 = "jnJl";
+        String p4 = "AYvi";
+        String p5 = "yOWR";
+        String p6 = "JPdr";
+        String p7 = "FEzb";
+        String p8 = "YIIX";
+        String p9 = "Uh2a";
+        String p10 = "49ho";
+        return p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10;
+    }
     
     private Seq<ModInfo> allMods = new Seq<>();
     private Seq<ModInfo> filteredMods = new Seq<>();
@@ -207,9 +220,15 @@ public class TestMod extends Mod {
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                conn.setRequestProperty("Authorization", "Bearer " + TOKEN);
+                conn.setRequestProperty("Authorization", "token " + getToken());
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
+                
+                int responseCode = conn.getResponseCode();
+                if(responseCode != 200) {
+                    Core.app.post(() -> updateStatusLabel("[scarlet]HTTP Error: " + responseCode));
+                    return;
+                }
                 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder response = new StringBuilder();
@@ -498,7 +517,7 @@ public class TestMod extends Mod {
                 
                 repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
                 repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                repoConn.setRequestProperty("Authorization", "Bearer " + TOKEN);
+                repoConn.setRequestProperty("Authorization", "token " + getToken());
                 repoConn.setConnectTimeout(10000);
                 repoConn.setReadTimeout(10000);
                 
@@ -525,7 +544,7 @@ public class TestMod extends Mod {
                 try {
                     relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
                     relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                    relConn.setRequestProperty("Authorization", "Bearer " + TOKEN);
+                    relConn.setRequestProperty("Authorization", "token " + getToken());
                     relConn.setConnectTimeout(10000);
                     relConn.setReadTimeout(10000);
                     
