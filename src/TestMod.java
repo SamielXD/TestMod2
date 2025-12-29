@@ -236,42 +236,43 @@ public class TestMod extends Mod {
     int getMaxPage() {
         return Math.max(0, (filteredMods.size - 1) / modsPerPage);
     }void fetchModList() {
-    updateStatusLabel("[cyan]Loading mods from GitHub...");
+    updateStatusLabel("[cyan]Loading installed mods...");
     Core.app.post(() -> {
-        try {
-            String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-            conn.setRequestProperty("Authorization", "token " + getToken());
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
+        allMods.clear();
+        
+        for(Mods.LoadedMod mod : Vars.mods.list()) {
+            ModInfo info = new ModInfo();
             
-            int responseCode = conn.getResponseCode();
-            if(responseCode != 200) {
-                Core.app.post(() -> updateStatusLabel("[scarlet]HTTP Error: " + responseCode));
-                return;
+            if(mod.meta != null) {
+                info.name = mod.meta.displayName();
+                info.author = mod.meta.author;
+                info.description = mod.meta.description;
+                info.version = mod.meta.version;
+                info.repo = mod.repo != null ? mod.repo : "";
+            } else {
+                info.name = mod.name;
+                info.author = "Unknown";
+                info.description = "";
+                info.version = "1.0";
+                info.repo = "";
             }
             
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while((line = reader.readLine()) != null) response.append(line);
-            reader.close();
+            info.hasJava = mod.main != null;
+            info.hasScripts = mod.hasScripts();
+            info.stars = 0;
+            info.lastUpdated = "";
             
-            Seq<ModInfo> mods = parseModList(response.toString());
-            mods.sort(m -> -m.stars);
-            
-            Core.app.post(() -> {
-                allMods = mods;
-                currentPage = 0;
-                applyFilter();
-                updateVisibleMods();
-            });
-        } catch(Exception ex) {
-            Core.app.post(() -> updateStatusLabel("[scarlet]Failed: " + ex.getMessage()));
-            Log.err("Fetch error", ex);
+            allMods.add(info);
         }
+        
+        allMods.sort(m -> m.name);
+        
+        Core.app.post(() -> {
+            currentPage = 0;
+            applyFilter();
+            updateVisibleMods();
+            updateStatusLabel("Loaded " + allMods.size + " installed mods");
+        });
     });
 }
 
@@ -371,15 +372,17 @@ void buildModRow(Table table, ModInfo mod) {
                 showModDetails(mod);
             }).tooltip("Details");
             
-            btns.button(Icon.link, Styles.clearNonei, () -> {
-                Core.app.openURI("https://github.com/" + mod.repo);
-            }).tooltip("GitHub");
+            if(!mod.repo.isEmpty()) {
+                btns.button(Icon.link, Styles.clearNonei, () -> {
+                    Core.app.openURI("https://github.com/" + mod.repo);
+                }).tooltip("GitHub");
+            }
             
-            if(installed == null) {
+            if(installed == null && !mod.repo.isEmpty()) {
                 btns.button(Icon.download, Styles.clearNonei, () -> {
                     installMod(mod);
                 }).tooltip("Install");
-            } else {
+            } else if(installed != null) {
                 btns.image(Icon.ok).size(40f).color(Color.green);
             }
         }).right().padRight(10f);
@@ -469,11 +472,15 @@ void showModDetails(ModInfo mod) {
     info.add("[lightgray]Version:").padRight(15f);
     info.add("[white]" + mod.version).row();
     
-    info.add("[lightgray]Repository:").padRight(15f);
-    info.add("[white]" + mod.repo).row();
+    if(!mod.repo.isEmpty()) {
+        info.add("[lightgray]Repository:").padRight(15f);
+        info.add("[white]" + mod.repo).row();
+    }
     
-    info.add("[lightgray]Stars:").padRight(15f);
-    info.add("[yellow]\u2605 " + mod.stars).row();
+    if(mod.stars > 0) {
+        info.add("[lightgray]Stars:").padRight(15f);
+        info.add("[yellow]\u2605 " + mod.stars).row();
+    }
     
     main.add(info).left().fillX().pad(10f).row();
     
@@ -488,20 +495,16 @@ void showModDetails(ModInfo mod) {
         main.image().color(accentColor).height(3f).fillX().pad(10f).row();
     }
     
-    Table statsTable = new Table();
-    statsTable.add("[cyan]Loading stats...").pad(15f);
-    main.add(statsTable).row();
-    
-    main.image().color(accentColor).height(3f).fillX().pad(10f).row();
-    
     Table actions = new Table();
     actions.defaults().size(240f, 55f).pad(8f);
     
-    actions.button("Open GitHub", Icon.link, () -> {
-        Core.app.openURI("https://github.com/" + mod.repo);
-    });
+    if(!mod.repo.isEmpty()) {
+        actions.button("Open GitHub", Icon.link, () -> {
+            Core.app.openURI("https://github.com/" + mod.repo);
+        });
+    }
     
-    if(installed == null) {
+    if(installed == null && !mod.repo.isEmpty()) {
         actions.button("Install", Icon.download, () -> {
             installMod(mod);
             dialog.hide();
@@ -517,9 +520,7 @@ void showModDetails(ModInfo mod) {
     ScrollPane pane = new ScrollPane(main);
     dialog.cont.add(pane).size(600f, 700f);
     dialog.show();
-    
-    loadGitHubStats(mod, statsTable);
-}void loadGitHubStats(ModInfo mod, Table statsTable) {
+                    }void loadGitHubStats(ModInfo mod, Table statsTable) {
         String key = mod.repo;
         if(statsCache.containsKey(key)) {
             displayStats(statsTable, mod, statsCache.get(key));
@@ -667,4 +668,4 @@ void showModDetails(ModInfo mod) {
         int releases = 0;
         int stars = 0;
     }
-}
+        }
