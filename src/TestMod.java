@@ -600,135 +600,113 @@ public class TestMod extends Mod {
         boolean isPortrait = Core.graphics.getHeight() > Core.graphics.getWidth();
         
         table.table(Tex.button, row -> {
-            row.margin(15f);
+            row.margin(8f);
             row.left();
             
             TextureRegion icon = getModIcon(mod, installed);
-            float iconSize = isPortrait ? 80f : 90f;
+            float iconSize = isPortrait ? 64f : 72f;
             if(icon != null) {
-                row.image(icon).size(iconSize).padRight(15f);
+                row.image(icon).size(iconSize).padRight(12f);
             } else {
-                row.image(Icon.box).size(iconSize).color(Color.gray).padRight(15f);
+                row.image(Icon.box).size(iconSize).color(Color.gray).padRight(12f);
             }
             
             row.table(info -> {
                 info.left().defaults().left();
                 
-                info.table(title -> {
-                    title.left();
+                info.table(titleRow -> {
+                    titleRow.left();
                     
                     Label nameLabel = new Label(mod.name);
                     nameLabel.setStyle(Styles.outlineLabel);
                     nameLabel.setColor(accentColor);
                     nameLabel.setEllipsis(true);
-                    nameLabel.setWrap(true);
-                    float maxNameWidth = isPortrait ? 250f : 400f;
-                    title.add(nameLabel).maxWidth(maxNameWidth).padRight(10f).fillX();
-                    
-                    title.row();
-                    
-                    Table badges = new Table();
-                    badges.left();
-                    badges.defaults().padRight(8f).padTop(5f);
+                    nameLabel.setWrap(false);
+                    float maxNameWidth = isPortrait ? 200f : 350f;
+                    titleRow.add(nameLabel).maxWidth(maxNameWidth).padRight(8f);
                     
                     if(mod.hasJava) {
                         TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
                         if(javaBadge != null) {
-                            Image img = badges.image(javaBadge).size(36f, 22f).get();
-                            img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
+                            titleRow.image(javaBadge).size(28f, 18f).padRight(6f).tooltip("Java Mod");
                         } else {
-                            Label lbl = badges.add("[#b07219]JAVA").style(Styles.outlineLabel).get();
-                            lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
+                            titleRow.add("[#b07219]J").style(Styles.outlineLabel).padRight(6f);
                         }
                     } else if(mod.hasScripts) {
                         TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
                         if(jsBadge != null) {
-                            Image img = badges.image(jsBadge).size(36f, 22f).get();
-                            img.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts"));
+                            titleRow.image(jsBadge).size(28f, 18f).padRight(6f).tooltip("JS Mod");
                         } else {
-                            Label lbl = badges.add("[#f1e05a]JS").style(Styles.outlineLabel).get();
-                            lbl.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts"));
+                            titleRow.add("[#f1e05a]JS").style(Styles.outlineLabel).padRight(6f);
                         }
                     }
                     
-                    TextureRegion hjsonBadge = badgeSprites.get("testmod-hjson-badge");
-                    if(hjsonBadge != null) {
-                        Image hjsonImg = badges.image(hjsonBadge).size(36f, 22f).get();
-                        hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
-                    } else {
-                        Image hjsonImg = badges.image(Icon.book).size(20f).color(Color.valueOf("89e051")).get();
-                        hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
-                    }
+                    titleRow.image(Icon.book).size(16f).color(Color.valueOf("89e051")).padRight(6f).tooltip("HJSON");
                     
                     if(installed != null) {
-                        TextureRegion serverBadge = badgeSprites.get("testmod-server-badge");
                         if(mod.isServerCompatible) {
-                            if(serverBadge != null) {
-                                Image hostImg = badges.image(serverBadge).size(36f, 22f).get();
-                                hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer"));
-                            } else {
-                                Image hostImg = badges.image(Icon.host).size(20f).color(Color.sky).get();
-                                hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer"));
-                            }
+                            titleRow.image(Icon.host).size(16f).color(Color.sky).padRight(6f).tooltip("Server");
                         } else {
-                            Image clientImg = badges.image(Icon.players).size(20f).color(Color.orange).get();
-                            clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]Singleplayer only"));
+                            titleRow.image(Icon.players).size(16f).color(Color.orange).padRight(6f).tooltip("Client Only");
                         }
                         
                         if(installed.enabled()) {
-                            badges.image(Icon.ok).size(22f).color(Color.lime);
+                            titleRow.image(Icon.ok).size(16f).color(Color.lime).tooltip("Enabled");
                         } else {
-                            badges.image(Icon.cancel).size(22f).color(Color.scarlet);
+                            titleRow.image(Icon.cancel).size(16f).color(Color.scarlet).tooltip("Disabled");
                         }
                     }
-                    
-                    title.add(badges).padLeft(8f).fillX();
                 }).fillX().row();
                 
-                info.add("[lightgray]" + mod.author + " [gray]| v" + mod.version).padTop(8f).row();
+                Label authorLabel = new Label("[lightgray]" + mod.author + " [gray]v" + mod.version);
+                authorLabel.setEllipsis(true);
+                authorLabel.setWrap(false);
+                float maxAuthorWidth = isPortrait ? 200f : 350f;
+                info.add(authorLabel).maxWidth(maxAuthorWidth).padTop(4f).row();
                 
-                info.table(stats -> {
-                    stats.left().defaults().left().padRight(15f);
-                    if(mod.stars > 0) {
-                        stats.image(Icon.star).size(18f).color(Color.yellow).padRight(4f);
-                        stats.add("[yellow]" + mod.stars).padRight(15f);
-                    }
-                    if(mod.downloads > 0) {
-                        stats.image(Icon.download).size(18f).color(Color.lime).padRight(4f);
-                        stats.add("[lime]" + mod.downloads).padRight(15f);
-                    }
-                    if(mod.releases > 0) {
-                        stats.image(Icon.box).size(18f).color(Color.cyan).padRight(4f);
-                        stats.add("[cyan]" + mod.releases);
-                    }
-                    if(mod.stars == 0 && mod.downloads == 0 && mod.releases == 0 && !mod.repo.isEmpty()) {
-                        stats.add("[darkgray]Loading stats...").padRight(15f);
-                    }
-                }).padTop(8f).row();
+                if(mod.stars > 0 || mod.downloads > 0 || mod.releases > 0) {
+                    info.table(stats -> {
+                        stats.left().defaults().left().padRight(12f);
+                        if(mod.stars > 0) {
+                            stats.image(Icon.star).size(14f).color(Color.yellow).padRight(3f);
+                            stats.add("[yellow]" + mod.stars);
+                        }
+                        if(mod.downloads > 0) {
+                            stats.image(Icon.download).size(14f).color(Color.lime).padRight(3f);
+                            stats.add("[lime]" + mod.downloads);
+                        }
+                        if(mod.releases > 0) {
+                            stats.image(Icon.box).size(14f).color(Color.cyan).padRight(3f);
+                            stats.add("[cyan]" + mod.releases);
+                        }
+                    }).padTop(4f).row();
+                } else if(!mod.repo.isEmpty()) {
+                    info.add("[darkgray]Loading...").padTop(4f).row();
+                }
                 
-            }).growX().padLeft(10f);
+            }).growX().padLeft(8f);
             
             row.table(btns -> {
-                btns.defaults().size(65f).pad(5f);
+                btns.defaults().size(50f).pad(3f);
                 
                 btns.button(Icon.info, Styles.clearNonei, () -> {
                     showModDetails(mod);
-                }).tooltip("Details").row();
+                }).tooltip("Details");
                 
                 if(installed != null) {
                     btns.button(installed.enabled() ? Icon.cancel : Icon.ok, Styles.clearNonei, () -> {
                         toggleModState(mod, installed);
                     }).tooltip(installed.enabled() ? "Disable" : "Enable")
-                      .update(b -> b.getStyle().imageUpColor = installed.enabled() ? Color.orange : Color.lime).row();
+                      .update(b -> b.getStyle().imageUpColor = installed.enabled() ? Color.orange : Color.lime);
                     
                     btns.button(Icon.trash, Styles.clearNonei, () -> {
                         confirmDelete(mod, installed);
-                    }).tooltip("Delete").update(b -> b.getStyle().imageUpColor = Color.scarlet).row();
+                    }).tooltip("Delete").update(b -> b.getStyle().imageUpColor = Color.scarlet);
                     
                 } else if(!mod.repo.isEmpty()) {
                     btns.button(Icon.download, Styles.clearNonei, () -> {
                         installMod(mod);
-                    }).tooltip("Install").update(b -> b.getStyle().imageUpColor = Color.sky).row();
+                    }).tooltip("Install").update(b -> b.getStyle().imageUpColor = Color.sky);
                 }
                 
                 if(!mod.repo.isEmpty()) {
@@ -737,9 +715,9 @@ public class TestMod extends Mod {
                     }).tooltip("GitHub");
                 }
                 
-            }).right().padRight(12f);
+            }).right().padRight(8f);
             
-        }).fillX().minHeight(160f).pad(10f).row();
+        }).fillX().height(isPortrait ? 100f : 110f).pad(6f).row();
     }
 
     void toggleModState(ModInfo mod, Mods.LoadedMod installed) {
@@ -790,8 +768,20 @@ public class TestMod extends Mod {
     }
 
     TextureRegion getModIcon(ModInfo mod, Mods.LoadedMod installed) {
-        if(installed != null && installed.iconTexture != null) {
-            return new TextureRegion(installed.iconTexture);
+        if(installed != null) {
+            if(installed.iconTexture != null) {
+                return new TextureRegion(installed.iconTexture);
+            }
+            
+            if(installed.root != null) {
+                Fi iconFile = installed.root.child("icon.png");
+                if(iconFile.exists()) {
+                    try {
+                        Texture tex = new Texture(iconFile);
+                        return new TextureRegion(tex);
+                    } catch(Exception e) {}
+                }
+            }
         }
         
         String key = mod.name.toLowerCase();
@@ -815,129 +805,106 @@ public class TestMod extends Mod {
         BaseDialog dialog = new BaseDialog("");
         
         Table main = new Table(Tex.pane);
-        main.margin(25f);
+        main.margin(20f);
         
         Table header = new Table();
         header.background(Tex.button);
         
         TextureRegion icon = getModIcon(mod, installed);
         if(icon != null) {
-            header.image(icon).size(110f).pad(15f);
+            header.image(icon).size(96f).pad(12f);
         } else {
-            header.image(Icon.box).size(110f).color(Color.gray).pad(15f);
+            header.image(Icon.box).size(96f).color(Color.gray).pad(12f);
         }
         
         header.table(title -> {
             title.left().defaults().left();
-            title.add("[accent]" + mod.name).style(Styles.outlineLabel).padBottom(5f).row();
+            title.add("[accent]" + mod.name).style(Styles.outlineLabel).padBottom(4f).row();
             title.add("[cyan]by " + mod.author).row();
-        }).growX().padLeft(15f);
+        }).growX().padLeft(12f);
         
-        main.add(header).fillX().pad(10f).row();
+        main.add(header).fillX().pad(8f).row();
         
-        main.image().color(accentColor).height(4f).fillX().pad(10f).row();
+        main.image().color(accentColor).height(3f).fillX().pad(8f).row();
         
         Table badges = new Table();
         badges.left();
-        badges.defaults().padRight(12f);
+        badges.defaults().padRight(10f);
         
         if(mod.hasJava) {
             TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
             if(javaBadge != null) {
-                Image img = badges.image(javaBadge).size(52f, 32f).get();
-                img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
+                badges.image(javaBadge).size(44f, 28f).tooltip("Java Mod");
             } else {
-                Label lbl = badges.add("[#b07219]JAVA").style(Styles.outlineLabel).get();
-                lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
+                badges.add("[#b07219]JAVA").style(Styles.outlineLabel);
             }
         } else if(mod.hasScripts) {
             TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
             if(jsBadge != null) {
-                Image img = badges.image(jsBadge).size(52f, 32f).get();
-                img.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript"));
+                badges.image(jsBadge).size(44f, 28f).tooltip("JS Mod");
             } else {
-                Label lbl = badges.add("[#f1e05a]JS").style(Styles.outlineLabel).get();
-                lbl.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript"));
+                badges.add("[#f1e05a]JS").style(Styles.outlineLabel);
             }
         }
         
-        TextureRegion hjsonBadge = badgeSprites.get("testmod-hjson-badge");
-        if(hjsonBadge != null) {
-            Image hjsonImg = badges.image(hjsonBadge).size(52f, 32f).get();
-            hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
-        } else {
-            Image hjsonImg = badges.image(Icon.book).size(28f).color(Color.valueOf("89e051")).get();
-            hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format for metadata configuration"));
-        }
+        badges.image(Icon.book).size(24f).color(Color.valueOf("89e051")).tooltip("HJSON");
         
         if(installed != null) {
-            TextureRegion serverBadge = badgeSprites.get("testmod-server-badge");
             if(mod.isServerCompatible) {
-                if(serverBadge != null) {
-                    Image hostImg = badges.image(serverBadge).size(52f, 32f).get();
-                    hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
-                } else {
-                    Image hostImg = badges.image(Icon.host).size(26f).color(Color.sky).get();
-                    hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
-                    badges.add("[sky]Server Compatible").style(Styles.outlineLabel);
-                }
+                badges.image(Icon.host).size(24f).color(Color.sky).tooltip("Server Compatible");
             } else {
-                Image clientImg = badges.image(Icon.players).size(26f).color(Color.orange).get();
-                clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]This mod only works in singleplayer"));
-                badges.add("[orange]Client Only").style(Styles.outlineLabel);
+                badges.image(Icon.players).size(24f).color(Color.orange).tooltip("Client Only");
             }
-        }
-        
-        if(installed != null) {
+            
             if(installed.enabled()) {
-                badges.image(Icon.ok).size(30f).color(Color.lime).padLeft(12f);
+                badges.image(Icon.ok).size(26f).color(Color.lime).padLeft(8f);
                 badges.add("[lime]Enabled").style(Styles.outlineLabel);
             } else {
-                badges.image(Icon.cancel).size(30f).color(Color.scarlet).padLeft(12f);
+                badges.image(Icon.cancel).size(26f).color(Color.scarlet).padLeft(8f);
                 badges.add("[scarlet]Disabled").style(Styles.outlineLabel);
             }
         }
         
-        main.add(badges).left().pad(10f).row();
+        main.add(badges).left().pad(8f).row();
         
         Table info = new Table();
-        info.left().defaults().left().pad(5f);
+        info.left().defaults().left().pad(4f);
         
-        info.add("[lightgray]Version:").padRight(15f);
+        info.add("[lightgray]Version:").padRight(12f);
         info.add("[white]" + mod.version).row();
         
         if(!mod.repo.isEmpty()) {
-            info.add("[lightgray]Repository:").padRight(15f);
+            info.add("[lightgray]Repository:").padRight(12f);
             info.add("[white]" + mod.repo).row();
         }
         
-        main.add(info).left().fillX().pad(10f).row();
+        main.add(info).left().fillX().pad(8f).row();
         
         if(!mod.repo.isEmpty()) {
-            main.image().color(accentColor).height(3f).fillX().pad(10f).row();
+            main.image().color(accentColor).height(2f).fillX().pad(8f).row();
             
             Table statsTable = new Table();
-            statsTable.left().defaults().left().pad(6f);
+            statsTable.left().defaults().left().pad(5f);
             statsTable.add("[lightgray]Loading GitHub stats...").colspan(2).row();
-            main.add(statsTable).left().fillX().pad(10f).row();
+            main.add(statsTable).left().fillX().pad(8f).row();
             
             loadGitHubStats(mod, statsTable);
         }
         
-        main.image().color(accentColor).height(3f).fillX().pad(10f).row();
+        main.image().color(accentColor).height(2f).fillX().pad(8f).row();
         
         if(!mod.description.isEmpty()) {
-            main.add("[accent]Description:").left().padLeft(15f).padTop(10f).row();
+            main.add("[accent]Description:").left().padLeft(12f).padTop(8f).row();
             Label desc = new Label(mod.description);
             desc.setWrap(true);
             desc.setColor(Color.lightGray);
             desc.setAlignment(Align.left);
-            main.add(desc).width(500f).pad(15f).left().row();
-            main.image().color(accentColor).height(3f).fillX().pad(10f).row();
+            main.add(desc).width(500f).pad(12f).left().row();
+            main.image().color(accentColor).height(2f).fillX().pad(8f).row();
         }
         
         Table actions = new Table();
-        actions.defaults().size(240f, 60f).pad(10f);
+        actions.defaults().size(220f, 55f).pad(8f);
         
         if(!mod.repo.isEmpty()) {
             actions.button("Open GitHub", Icon.link, () -> {
@@ -965,14 +932,14 @@ public class TestMod extends Mod {
             });
         }
         
-        main.add(actions).fillX().pad(10f).row();
+        main.add(actions).fillX().pad(8f).row();
         
         main.button("Close", Icon.cancel, () -> {
             dialog.hide();
-        }).size(200f, 50f).pad(10f);
+        }).size(180f, 45f).pad(8f);
         
         ScrollPane pane = new ScrollPane(main);
-        dialog.cont.add(pane).size(600f, 700f);
+        dialog.cont.add(pane).size(580f, 680f);
         dialog.show();
     }
 
@@ -1008,19 +975,19 @@ public class TestMod extends Mod {
     void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
         Core.app.post(() -> {
             statsTable.clearChildren();
-            statsTable.defaults().left().pad(6f);
+            statsTable.defaults().left().pad(5f);
             
-            statsTable.add("[yellow]★ Stars:").padRight(15f);
+            statsTable.add("[yellow]★ Stars:").padRight(12f);
             statsTable.add("[white]" + stats.stars).row();
             
-            statsTable.add("[lime]↓ Downloads:").padRight(15f);
+            statsTable.add("[lime]↓ Downloads:").padRight(12f);
             statsTable.add("[white]" + stats.downloads).row();
             
-            statsTable.add("[cyan]⚡ Releases:").padRight(15f);
+            statsTable.add("[cyan]⚡ Releases:").padRight(12f);
             statsTable.add("[white]" + stats.releases).row();
             
             if(!mod.lastUpdated.isEmpty()) {
-                statsTable.add("[lightgray]Updated:").padRight(15f);
+                statsTable.add("[lightgray]Updated:").padRight(12f);
                 statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
             }
         });
@@ -1029,13 +996,13 @@ public class TestMod extends Mod {
     void displayStatsError(Table statsTable, ModInfo mod) {
         Core.app.post(() -> {
             statsTable.clearChildren();
-            statsTable.defaults().left().pad(6f);
+            statsTable.defaults().left().pad(5f);
             
             statsTable.add("[scarlet]Stats unavailable").colspan(2).row();
             statsTable.add("[darkgray]API rate limit or network error").colspan(2).row();
             statsTable.add("[lightgray]Retrying with next token...").colspan(2).row();
             if(!mod.lastUpdated.isEmpty()) {
-                statsTable.add("[lightgray]Updated:").padRight(15f);
+                statsTable.add("[lightgray]Updated:").padRight(12f);
                 statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
             }
         });
