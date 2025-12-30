@@ -53,7 +53,7 @@ public class TestMod extends Mod {
     private ObjectSet<String> currentlyLoadingStats = new ObjectSet<>();
     private static final long CACHE_TIME = 300000;
     private int currentPage = 0;
-    private int modsPerPage = 8;
+    private int modsPerPage = 10;
     private String searchQuery = "";
     private BaseDialog browserDialog;
     private Table modListContainer;
@@ -64,15 +64,14 @@ public class TestMod extends Mod {
     private Color accentColor = Color.valueOf("ffd37f");
     private Color enabledColor = Color.valueOf("84f491");
     private Color disabledColor = Color.valueOf("f25555");
-    private Color bgDark = Color.valueOf("1c1c1c");
-    private Color cardBg = Color.valueOf("2d2d2d");
-    private Color borderColor = Color.valueOf("454545");
     
     private ObjectMap<String, TextureRegion> badgeSprites = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
     private int currentTab = 0;
     private String sortMode = "updated";
     private long lastRefreshTime = 0;
+    private boolean expandEnabled = true;
+    private boolean expandDisabled = false;
 
     public TestMod() {
         Log.info("ModInfo+ Browser Initializing");
@@ -80,10 +79,10 @@ public class TestMod extends Mod {
     }
     
     void initTokens() {
-        tokens.add(new TokenInfo(new String[]{"ghp_", "ljb7p6nUp", "WfeWGW1oo", "kX2Fhht9X", "TqT1Pnffd"}));
-        tokens.add(new TokenInfo(new String[]{"ghp_", "mPsirCTWN", "qhVCEmOY2", "VszbFPf7Y", "OTP0N7tCf"}));
-        tokens.add(new TokenInfo(new String[]{"ghp_", "hLczgAeJ9", "C7zMWZxQN", "OYIxeMxrl", "ELx2rABtr"}));
-        tokens.add(new TokenInfo(new String[]{"ghp_", "RF5cOOMkN", "CxAItejWz", "7qjT8dOuH", "gPl088JeG"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "VVNy", "jnJl", "AYvi", "yOWR", "JPdr", "FEzb", "YIIX", "Uh2a", "49ho"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "ljb7", "p6nU", "pWfe", "WGW1", "ookX", "2Fhh", "t9XT", "qT1P", "nffd"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "mPsi", "rCTW", "Nqh", "VCEm", "OY2V", "szbF", "Pf7Y", "OTP0", "N7tC"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "hLcz", "gAeJ", "9C7z", "MWZx", "QNOY", "Ixe", "Mxrl", "ELx2", "rABt"}));
     }
     
     String getNextToken() {
@@ -123,22 +122,17 @@ public class TestMod extends Mod {
             Core.app.post(() -> {
                 loadAllBadgeSprites();
                 loadModIcons();
+                addModInfoButton();
             });
         });
-        addModInfoButton();
     }
     
     void loadAllBadgeSprites() {
-        String[] badgeNames = {
-            "testmod-java-badge",
-            "testmod-js-badge"
-        };
-        
+        String[] badgeNames = {"testmod-java-badge", "testmod-js-badge"};
         for(String name : badgeNames) {
             TextureRegion region = Core.atlas.find(name);
             if(region.found()) {
                 badgeSprites.put(name, region);
-                Log.info("Loaded badge sprite: " + name);
             }
         }
     }
@@ -153,1157 +147,697 @@ public class TestMod extends Mod {
                 }
             }
         }
-        Log.info("Loaded " + modIcons.size + " mod icons");
     }
     
     void addModInfoButton() {
-        Events.on(ClientLoadEvent.class, event -> {
+        Vars.ui.mods.shown(() -> {
             Core.app.post(() -> {
-                try {
-                    java.lang.reflect.Field menuField = Vars.ui.menufrag.getClass().getDeclaredField("menu");
-                    menuField.setAccessible(true);
-                    Table menu = (Table)menuField.get(Vars.ui.menufrag);
-                    
-                    for(Element child : menu.getChildren()) {
-                        if(child instanceof TextButton) {
-                            TextButton btn = (TextButton)child;
-                            String text = btn.getText().toString().toLowerCase();
-                            if(text.contains("mod")) {
-                                btn.getListeners().clear();
-                                btn.clicked(() -> {
-                                    showEnhancedBrowser();
-                                });
-                                return;
-                            }
-                        }
-                    }
-                } catch(Exception e) {}
-                
-                Vars.ui.mods.shown(() -> {
-                    Core.app.post(() -> {
-                        Vars.ui.mods.hide();
-                        showEnhancedBrowser();
-                    });
-                });
+                Vars.ui.mods.hide();
+                showEnhancedBrowser();
             });
         });
-    }
-    
-    String truncateName(String name, int maxLength) {
-        if(name.length() <= maxLength) {
-            return name;
-        }
-        return name.substring(0, maxLength) + "...";
-    }
-    
-    <T extends Element> Cell<T> addTooltip(Cell<T> cell, String text) {
-        cell.get().addListener(new InputListener() {
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                return true;
-            }
-            
-            public void enter(InputEvent event, float x, float y, int pointer, Element fromActor) {
-                if(pointer == -1) {
-                    Vars.ui.showInfoToast(text, 2f);
-                }
-            }
-        });
-        return cell;
     }void showEnhancedBrowser() {
-        if(browserDialog != null) {
-            browserDialog.show();
-            return;
-        }
-        browserDialog = new BaseDialog("");
-        browserDialog.cont.clear();
-        
-        boolean isPortrait = Core.graphics.getHeight() > Core.graphics.getWidth();
-        float screenWidth = Core.graphics.getWidth();
-        float screenHeight = Core.graphics.getHeight();
-        
-        Table main = new Table();
-        main.setBackground(Styles.black6);
-        
-        if(isPortrait) {
-            buildPortraitUI(main);
-        } else {
-            buildLandscapeUI(main);
-        }
-        
-        browserDialog.cont.add(main).size(screenWidth, screenHeight);
+    if(browserDialog != null) {
         browserDialog.show();
-        fetchModList();
+        return;
     }
+    browserDialog = new BaseDialog("Mods");
+    browserDialog.addCloseButton();
     
-    void buildPortraitUI(Table main) {
-        Table header = new Table();
-        header.setBackground(Styles.black8);
-        
-        header.table(top -> {
-            Label titleLabel = new Label("[accent]Mods");
-            titleLabel.setStyle(Styles.outlineLabel);
-            titleLabel.setFontScale(1.2f);
-            top.add(titleLabel).padLeft(16f).growX().left();
-            addTooltip(top.button(Icon.cancel, Styles.clearNonei, () -> browserDialog.hide())
-                .size(45f).pad(8f), "Close");
-        }).fillX().height(60f).row();
-        
-        header.table(tabs -> {
-            tabs.defaults().height(50f).growX().pad(4f);
-            addTooltip(tabs.button("Enabled Mods", Styles.flatTogglet, () -> {
-                currentTab = 0;
-                fetchModList();
-            }).checked(b -> currentTab == 0), "View enabled mods");
-            
-            addTooltip(tabs.button("Disabled Mods", Styles.flatTogglet, () -> {
-                currentTab = 1;
-                fetchDisabledMods();
-            }).checked(b -> currentTab == 1), "View disabled mods");
-            
-            addTooltip(tabs.button("Browse", Styles.flatTogglet, () -> {
-                currentTab = 2;
-                fetchRemoteMods();
-            }).checked(b -> currentTab == 2), "Browse online mods");
-        }).fillX().padTop(4f).row();
-        
-        main.add(header).fillX().row();
-        
-        main.image().color(accentColor).fillX().height(3f).row();
-        
-        main.table(controls -> {
-            controls.setBackground(Styles.black6);
-            controls.defaults().size(50f).pad(6f);
-            
-            addTooltip(controls.button(Icon.book, Styles.clearNonei, () -> {
-                Core.app.openURI("https://mindustrygame.github.io/wiki/modding");
-            }), "Modding guide");
-            
-            addTooltip(controls.button(Icon.refresh, Styles.clearNonei, () -> reloadMods()), "Refresh list");
-            addTooltip(controls.button(Icon.add, Styles.clearNonei, () -> importModFile()), "Import mod");
-            
-            controls.table(sort -> {
-                sort.defaults().height(40f).growX().pad(3f);
-                addTooltip(sort.button("Recent", Styles.flatTogglet, () -> {
-                    sortMode = "updated";
-                    applySort();
-                }).checked(b -> sortMode.equals("updated")), "Sort by update date");
-                
-                addTooltip(sort.button("Stars", Styles.flatTogglet, () -> {
-                    sortMode = "stars";
-                    applySort();
-                }).checked(b -> sortMode.equals("stars")), "Sort by stars");
-                
-                addTooltip(sort.button("Name", Styles.flatTogglet, () -> {
-                    sortMode = "name";
-                    applySort();
-                }).checked(b -> sortMode.equals("name")), "Sort alphabetically");
-            }).growX();
-        }).fillX().height(65f).row();
-        
-        buildSearchBar(main);
-        buildModList(main);
-        buildPaginationBar();
-        main.add(paginationBar).fillX().height(60f).row();
-    }
+    Table main = new Table(Tex.pane);
     
-    void buildLandscapeUI(Table main) {
-        Table header = new Table();
-        header.setBackground(Styles.black8);
-        
-        header.table(left -> {
-            Label titleLabel = new Label("[accent]Mods");
-            titleLabel.setStyle(Styles.outlineLabel);
-            titleLabel.setFontScale(1.3f);
-            left.add(titleLabel).padLeft(20f).growX().left();
-        }).growX();
-        
-        header.table(tabs -> {
-            tabs.defaults().size(130f, 50f).pad(4f);
-            addTooltip(tabs.button("Enabled", Styles.flatTogglet, () -> {
-                currentTab = 0;
-                fetchModList();
-            }).checked(b -> currentTab == 0), "View enabled mods");
-            
-            addTooltip(tabs.button("Disabled", Styles.flatTogglet, () -> {
-                currentTab = 1;
-                fetchDisabledMods();
-            }).checked(b -> currentTab == 1), "View disabled mods");
-            
-            addTooltip(tabs.button("Browse", Styles.flatTogglet, () -> {
-                currentTab = 2;
-                fetchRemoteMods();
-            }).checked(b -> currentTab == 2), "Browse online mods");
-        }).padRight(10f);
-        
-        header.table(actions -> {
-            actions.defaults().size(50f).pad(4f);
-            addTooltip(actions.button(Icon.book, Styles.clearNonei, () -> {
-                Core.app.openURI("https://mindustrygame.github.io/wiki/modding");
-            }), "Modding guide");
-            addTooltip(actions.button(Icon.refresh, Styles.clearNonei, () -> reloadMods()), "Refresh list");
-            addTooltip(actions.button(Icon.add, Styles.clearNonei, () -> importModFile()), "Import mod");
-            addTooltip(actions.button(Icon.cancel, Styles.clearNonei, () -> browserDialog.hide()), "Close");
-        }).padRight(10f);
-        
-        main.add(header).fillX().height(70f).row();
-        
-        main.image().color(accentColor).fillX().height(3f).row();
-        
-        main.table(controls -> {
-            controls.setBackground(Styles.black6);
-            controls.table(sort -> {
-                sort.add("[lightgray]Sort by: ").padLeft(15f).padRight(8f);
-                sort.defaults().size(100f, 45f).pad(4f);
-                addTooltip(sort.button("Recent", Styles.flatTogglet, () -> {
-                    sortMode = "updated";
-                    applySort();
-                }).checked(b -> sortMode.equals("updated")), "Sort by update date");
-                
-                addTooltip(sort.button("Stars", Styles.flatTogglet, () -> {
-                    sortMode = "stars";
-                    applySort();
-                }).checked(b -> sortMode.equals("stars")), "Sort by stars");
-                
-                addTooltip(sort.button("Name", Styles.flatTogglet, () -> {
-                    sortMode = "name";
-                    applySort();
-                }).checked(b -> sortMode.equals("name")), "Sort alphabetically");
-            }).left().padLeft(10f);
-            
-            controls.add().growX();
-            
-            controls.label(() -> {
-                if(lastRefreshTime > 0) {
-                    long elapsed = (Time.millis() - lastRefreshTime) / 1000;
-                    return "[lightgray]Updated " + elapsed + "s ago";
-                }
-                return "";
-            }).padRight(15f);
-        }).fillX().height(60f).row();
-        
-        buildSearchBar(main);
-        buildModList(main);
-        buildPaginationBar();
-        main.add(paginationBar).fillX().height(60f).row();
-    }
-    
-    void buildSearchBar(Table main) {
-        main.table(search -> {
-            search.setBackground(Styles.black6);
-            search.image(Icon.zoom).size(32f).color(Color.lightGray).pad(10f);
-            searchField = new TextField();
-            searchField.setMessageText("Search mods...");
-            searchField.setStyle(Styles.defaultField);
-            searchField.changed(() -> {
-                searchQuery = searchField.getText().toLowerCase();
-                currentPage = 0;
-                applyFilter();
-            });
-            search.add(searchField).growX().height(50f).pad(10f);
-            addTooltip(search.button(Icon.cancel, Styles.clearNonei, () -> {
-                searchField.setText("");
-                searchQuery = "";
-                currentPage = 0;
-                applyFilter();
-            }).size(45f).visible(() -> !searchField.getText().isEmpty()), "Clear search");
-        }).fillX().height(70f).padTop(4f).row();
-    }
-    
-    void buildModList(Table main) {
-        statusLabel = new Label("");
-        main.add(statusLabel).pad(8f).row();
-        
-        modListContainer = new Table();
-        ScrollPane pane = new ScrollPane(modListContainer);
-        pane.setFadeScrollBars(false);
-        pane.setScrollingDisabled(true, false);
-        pane.setOverscroll(false, false);
-        main.add(pane).grow().pad(10f).row();
-    }
-    
-    void importModFile() {
-        Vars.platform.showFileChooser(true, "zip", "jar", file -> {
-            try {
-                Vars.mods.importMod(file);
-                Vars.ui.showInfo("[lime]Mod imported successfully!\n[lightgray]Restart to apply changes.");
-                reloadMods();
-            } catch(Exception e) {
-                Vars.ui.showErrorMessage("Import failed: " + e.getMessage());
-            }
-        });
-    }
-    
-    void reloadMods() {
-        allMods.clear();
-        filteredMods.clear();
-        statsCache.clear();
-        lastStatsFetch.clear();
-        currentlyLoadingStats.clear();
-        lastRefreshTime = Time.millis();
-        if(currentTab == 0) {
-            fetchModList();
-        } else if(currentTab == 1) {
-            fetchDisabledMods();
-        } else {
-            fetchRemoteMods();
-        }
-    }void buildPaginationBar() {
-        if(paginationBar == null) paginationBar = new Table();
-        paginationBar.clearChildren();
-        paginationBar.setBackground(Styles.black6);
-        
-        addTooltip(paginationBar.button("<", Styles.cleart, () -> {
-            if(currentPage > 0) {
-                currentPage--;
-                updateVisibleMods();
-            }
-        }).size(80f, 50f).disabled(b -> currentPage == 0), "Previous page");
-        
-        paginationBar.add().growX();
-        paginationBar.label(() -> "[accent]Page " + (currentPage + 1) + " / " + Math.max(1, getMaxPage() + 1) + 
-                         "  [lightgray]|  " + filteredMods.size + " mods").pad(10f);
-        paginationBar.add().growX();
-        
-        addTooltip(paginationBar.button(">", Styles.cleart, () -> {
-            if(currentPage < getMaxPage()) {
-                currentPage++;
-                updateVisibleMods();
-            }
-        }).size(80f, 50f).disabled(b -> currentPage >= getMaxPage()), "Next page");
-    }
-    
-    void applyFilter() {
-        filteredMods.clear();
-        if(searchQuery.isEmpty()) {
-            filteredMods.addAll(allMods);
-        } else {
-            for(ModInfo mod : allMods) {
-                if(mod.name.toLowerCase().contains(searchQuery) || 
-                    (mod.description != null && mod.description.toLowerCase().contains(searchQuery))) {
-                    filteredMods.add(mod);
-                }
-            }
-        }
-        applySort();
-    }
-    
-    void applySort() {
-        if(sortMode.equals("updated")) {
-            filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
-        } else if(sortMode.equals("stars")) {
-            filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
-        } else {
-            filteredMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
-        }
-        updateVisibleMods();
-    }
-    
-    void updateVisibleMods() {
-        modListContainer.clearChildren();
-        int start = currentPage * modsPerPage;
-        int end = Math.min(start + modsPerPage, filteredMods.size);
-        
-        if(filteredMods.isEmpty()) {
-            modListContainer.add("[lightgray]No mods found").pad(40f);
-        } else {
-            for(int i = start; i < end; i++) {
-                ModInfo mod = filteredMods.get(i);
-                buildModRow(modListContainer, mod);
-                
-                if(!mod.repo.isEmpty() && mod.stars == 0 && mod.downloads == 0) {
-                    loadVisibleModStats(mod);
-                }
-            }
-        }
-        updateStatusLabel("Showing " + (end - start) + " of " + filteredMods.size + " mods");
-        buildPaginationBar();
-    }
-    
-    void loadVisibleModStats(ModInfo mod) {
-        String key = mod.repo;
-        
-        if(currentlyLoadingStats.contains(key)) return;
-        
-        if(statsCache.containsKey(key)) {
-            Long lastFetch = lastStatsFetch.get(key, 0L);
-            if(Time.millis() - lastFetch < CACHE_TIME) {
-                ModStats stats = statsCache.get(key);
-                mod.stars = stats.stars;
-                mod.downloads = stats.downloads;
-                mod.releases = stats.releases;
-                return;
-            }
-        }
-        
-        currentlyLoadingStats.add(key);
-        
-        fetchModStats(mod, stats -> {
-            currentlyLoadingStats.remove(key);
-            if(stats != null) {
-                statsCache.put(key, stats);
-                lastStatsFetch.put(key, Time.millis());
-                mod.stars = stats.stars;
-                mod.downloads = stats.downloads;
-                mod.releases = stats.releases;
-                Core.app.post(() -> updateVisibleMods());
-            }
-        });
-    }
-    
-    void updateStatusLabel(String text) {
-        if(statusLabel != null) {
-            statusLabel.setText("[lightgray]" + text);
-        }
-    }
-    
-    int getMaxPage() {
-        return Math.max(0, (filteredMods.size - 1) / modsPerPage);
-    }
-
-    void fetchModList() {
-        updateStatusLabel("[cyan]Loading enabled mods...");
-        lastRefreshTime = Time.millis();
-        Core.app.post(() -> {
-            allMods.clear();
-            
-            for(Mods.LoadedMod mod : Vars.mods.list()) {
-                if(!mod.enabled()) continue;
-                
-                ModInfo info = new ModInfo();
-                
-                if(mod.meta != null) {
-                    info.name = mod.meta.name;
-                    info.author = mod.meta.author;
-                    info.description = mod.meta.description;
-                    info.version = mod.meta.version;
-                    info.hasJava = mod.meta.java;
-                    info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
-                    info.isServerCompatible = true;
-                    info.repo = mod.meta.repo != null ? mod.meta.repo : "";
-                } else {
-                    info.name = mod.name;
-                    info.author = "Unknown";
-                    info.description = "";
-                    info.version = "1.0";
-                    info.repo = "";
-                }
-                
-                info.installedMod = mod;
-                info.isInstalled = true;
-                info.isEnabled = true;
-                allMods.add(info);
-            }
-            
-            Core.app.post(() -> {
-                currentPage = 0;
-                applyFilter();
-            });
-        });
-    }
-
-    void fetchDisabledMods() {
-        updateStatusLabel("[cyan]Loading disabled mods...");
-        lastRefreshTime = Time.millis();
-        Core.app.post(() -> {
-            allMods.clear();
-            
-            for(Mods.LoadedMod mod : Vars.mods.list()) {
-                if(mod.enabled()) continue;
-                
-                ModInfo info = new ModInfo();
-                
-                if(mod.meta != null) {
-                    info.name = mod.meta.name;
-                    info.author = mod.meta.author;
-                    info.description = mod.meta.description;
-                    info.version = mod.meta.version;
-                    info.hasJava = mod.meta.java;
-                    info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
-                    info.repo = mod.meta.repo != null ? mod.meta.repo : "";
-                } else {
-                    info.name = mod.name;
-                    info.author = "Unknown";
-                    info.description = "";
-                    info.version = "1.0";
-                    info.repo = "";
-                }
-                
-                info.installedMod = mod;
-                info.isInstalled = true;
-                info.isEnabled = false;
-                allMods.add(info);
-            }
-            
-            Core.app.post(() -> {
-                currentPage = 0;
-                applyFilter();
-            });
-        });
-    }
-
-    void fetchRemoteMods() {
-        updateStatusLabel("[cyan]Fetching mod browser...");
-        Core.app.post(() -> {
-            HttpURLConnection conn = null;
-            try {
-                conn = (HttpURLConnection) new URL("https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json").openConnection();
-                conn.setRequestProperty("User-Agent", "ModInfo+");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-                
-                if(conn.getResponseCode() != 200) {
-                    Core.app.post(() -> updateStatusLabel("[scarlet]Failed to fetch mods"));
-                    return;
-                }
-                
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder json = new StringBuilder();
-                String line;
-                while((line = reader.readLine()) != null) json.append(line);
-                reader.close();
-                
-                Seq<ModInfo> mods = parseModList(json.toString());
-                Core.app.post(() -> {
-                    allMods.clear();
-                    allMods.addAll(mods);
-                    currentPage = 0;
-                    applyFilter();
-                });
-                
-            } catch(Exception e) {
-                Core.app.post(() -> updateStatusLabel("[scarlet]Network error"));
-            } finally {
-                if(conn != null) try { conn.disconnect(); } catch(Exception e) {}
-            }
-        });
-    }
-
-    Seq<ModInfo> parseModList(String json) {
-        Seq<ModInfo> mods = new Seq<>();
-        ObjectSet<String> installedRepos = new ObjectSet<>();
-        
-        for(Mods.LoadedMod mod : Vars.mods.list()) {
-            if(mod.meta != null && mod.meta.repo != null) {
-                installedRepos.add(mod.meta.repo);
-            }
-        }
-        
-        try {
-            JsonValue root = new JsonReader().parse(json);
-            for(JsonValue modJson : root) {
-                ModInfo mod = new ModInfo();
-                mod.repo = modJson.getString("repo", "");
-                mod.name = modJson.getString("name", "Unknown");
-                mod.author = modJson.getString("author", "Unknown");
-                mod.description = modJson.getString("description", "");
-                mod.version = modJson.getString("minGameVersion", "?");
-                mod.lastUpdated = modJson.getString("lastUpdated", "");
-                mod.hasJava = modJson.getBoolean("hasJava", false);
-                mod.hasScripts = modJson.getBoolean("hasScripts", false);
-                mod.isInstalled = installedRepos.contains(mod.repo);
-                
-                if(!mod.repo.isEmpty() && !mod.name.isEmpty()) {
-                    mods.add(mod);
-                }
-            }
-        } catch(Exception e) {}
-        return mods;
-    }
-
-    String formatDate(String dateStr) {
-        try {
-            String[] parts = dateStr.split("T")[0].split("-");
-            return parts[1] + "/" + parts[2] + "/" + parts[0];
-        } catch(Exception e) {
-            return dateStr;
-        }
-    }void buildModRow(Table table, ModInfo mod) {
-        Mods.LoadedMod installed = mod.installedMod;
-        
-        table.table(row -> {
-            row.setBackground(Styles.black6);
-            row.margin(8f);
-            row.left();
-            
-            TextureRegion icon = getModIcon(mod, installed);
-            float iconSize = 72f;
-            if(icon != null) {
-                row.image(icon).size(iconSize).pad(10f);
-            } else {
-                row.image(Icon.box).size(iconSize).color(Color.gray).pad(10f);
-            }
-            
-            row.table(info -> {
-                info.left().defaults().left().growX();
-                
-                info.table(nameRow -> {
-                    nameRow.left();
-                    Label nameLabel = new Label(mod.name);
-                    nameLabel.setStyle(Styles.outlineLabel);
-                    nameLabel.setColor(Color.white);
-                    nameRow.add(nameLabel).padRight(8f);
-                    
-                    if(mod.isInstalled) {
-                        nameRow.image(Icon.ok).size(20f).color(enabledColor).padRight(4f);
-                    }
-                }).left().row();
-                
-                info.add("[lightgray]v" + mod.version).left().padTop(2f).row();
-                
-                if(mod.hasJava || mod.hasScripts) {
-                    info.table(badges -> {
-                        badges.left().defaults().size(28f).pad(2f);
-                        
-                        if(mod.hasJava) {
-                            TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
-                            if(javaBadge != null) {
-                                Image badge = new Image(javaBadge);
-                                badge.setColor(Color.white);
-                                badges.add(badge).size(36f, 24f);
-                            } else {
-                                badges.image(Icon.pencil).color(Color.valueOf("b07219"));
-                            }
-                        } else if(mod.hasScripts) {
-                            TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
-                            if(jsBadge != null) {
-                                Image badge = new Image(jsBadge);
-                                badge.setColor(Color.white);
-                                badges.add(badge).size(36f, 24f);
-                            } else {
-                                badges.image(Icon.wrench).color(Color.valueOf("f1e05a"));
-                            }
-                        }
-                        
-                        badges.image(Icon.file).size(24f).color(Color.valueOf("89e051")).padLeft(4f);
-                        
-                        if(installed != null && mod.isServerCompatible) {
-                            badges.image(Icon.host).size(24f).color(Color.sky).padLeft(4f);
-                        }
-                    }).left().padTop(4f).row();
-                }
-                
-            }).growX().padLeft(10f).padRight(10f);
-            
-            row.table(actions -> {
-                actions.right().defaults().size(50f).pad(4f);
-                
-                if(installed != null) {
-                    if(installed.enabled()) {
-                        addTooltip(actions.button(Icon.ok, Styles.clearNonei, () -> {
-                            toggleModState(mod, installed);
-                        }).update(b -> ((ImageButton.ImageButtonStyle)b.getStyle()).imageUpColor = enabledColor), 
-                        "Disable mod");
-                    } else {
-                        addTooltip(actions.button(Icon.cancel, Styles.clearNonei, () -> {
-                            toggleModState(mod, installed);
-                        }).update(b -> ((ImageButton.ImageButtonStyle)b.getStyle()).imageUpColor = disabledColor), 
-                        "Enable mod");
-                    }
-                }
-                
-                addTooltip(actions.button(Icon.rightOpen, Styles.clearNonei, () -> {
-                    showModDetails(mod);
-                }), "View details");
-                
-            }).right().padRight(10f);
-            
-        }).fillX().minHeight(100f).pad(4f).row();
-    }
-
-    void toggleModState(ModInfo mod, Mods.LoadedMod installed) {
-        try {
-            if(installed.enabled()) {
-                Vars.mods.setEnabled(installed, false);
-                Vars.ui.showInfo("[orange]" + mod.name + " disabled.\n[lightgray]Restart required.");
-            } else {
-                Vars.mods.setEnabled(installed, true);
-                Vars.ui.showInfo("[lime]" + mod.name + " enabled.\n[lightgray]Restart required.");
-            }
-            reloadMods();
-        } catch(Exception e) {
-            Vars.ui.showErrorMessage("Failed to toggle mod state");
-        }
-    }
-
-    void confirmDelete(ModInfo mod, Mods.LoadedMod installed) {
-        BaseDialog confirm = new BaseDialog("Delete Mod");
-        confirm.cont.add("[scarlet]Delete " + mod.name + "?").pad(20f).row();
-        confirm.cont.add("[lightgray]This cannot be undone.").pad(10f).row();
-        
-        confirm.buttons.defaults().size(150f, 50f).pad(10f);
-        addTooltip(confirm.buttons.button("Cancel", Icon.cancel, () -> {
-            confirm.hide();
-        }), "Cancel");
-        addTooltip(confirm.buttons.button("Delete", Icon.trash, () -> {
-            deleteMod(mod, installed);
-            confirm.hide();
-        }).update(b -> b.getLabel().setColor(Color.scarlet)), "Delete permanently");
-        
-        confirm.show();
-    }
-
-    void deleteMod(ModInfo mod, Mods.LoadedMod installed) {
-        try {
-            if(installed.file != null && installed.file.file().exists()) {
-                installed.file.file().delete();
-            }
-            Vars.mods.list().remove(installed);
-            allMods.remove(mod);
+    main.table(search -> {
+        search.image(Icon.zoom).size(32f).padRight(8f);
+        searchField = new TextField();
+        searchField.setMessageText("Search mods...");
+        searchField.changed(() -> {
+            searchQuery = searchField.getText().toLowerCase();
+            currentPage = 0;
             applyFilter();
             updateVisibleMods();
-            Vars.ui.showInfo("[scarlet]" + mod.name + " deleted.\n[lightgray]Restart recommended.");
-        } catch(Exception e) {
-            Vars.ui.showErrorMessage("Failed to delete mod: " + e.getMessage());
-        }
-    }
-
-    TextureRegion getModIcon(ModInfo mod, Mods.LoadedMod installed) {
-        if(installed != null) {
-            if(installed.iconTexture != null) {
-                return new TextureRegion(installed.iconTexture);
+        });
+        search.add(searchField).growX().height(45f);
+        search.button(Icon.cancel, Styles.cleari, () -> {
+            searchField.setText("");
+            searchQuery = "";
+            applyFilter();
+        }).size(45f).visible(() -> !searchField.getText().isEmpty());
+    }).fillX().pad(10f).row();
+    
+    statusLabel = new Label("");
+    main.add(statusLabel).pad(8f).row();
+    
+    main.table(categories -> {
+        categories.left().defaults().left().fillX();
+        
+        categories.table(enabledHeader -> {
+            enabledHeader.button(b -> {
+                b.left();
+                b.image(() -> expandEnabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
+                b.add("[accent]Enabled Mods").style(Styles.outlineLabel);
+            }, Styles.clearTogglei, () -> {
+                expandEnabled = !expandEnabled;
+                if(expandEnabled && currentTab != 0) {
+                    currentTab = 0;
+                    fetchModList();
+                }
+            }).growX().height(50f).checked(b -> expandEnabled);
+        }).fillX().row();
+        
+        Table enabledList = new Table();
+        categories.add(enabledList).fillX().padLeft(20f).row();
+        
+        categories.table(disabledHeader -> {
+            disabledHeader.button(b -> {
+                b.left();
+                b.image(() -> expandDisabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
+                b.add("[lightgray]Disabled Mods").style(Styles.outlineLabel);
+            }, Styles.clearTogglei, () -> {
+                expandDisabled = !expandDisabled;
+                if(expandDisabled && currentTab != 1) {
+                    currentTab = 1;
+                    fetchDisabledMods();
+                }
+            }).growX().height(50f).checked(b -> expandDisabled);
+        }).fillX().row();
+        
+        Table disabledList = new Table();
+        categories.add(disabledList).fillX().padLeft(20f).row();
+        
+        categories.update(() -> {
+            if(expandEnabled && currentTab == 0) {
+                if(enabledList.getChildren().isEmpty() || enabledList != modListContainer) {
+                    enabledList.clearChildren();
+                    modListContainer = enabledList;
+                    updateVisibleMods();
+                }
+                enabledList.visible = true;
+            } else {
+                enabledList.visible = false;
             }
             
-            if(installed.root != null) {
-                Fi iconFile = installed.root.child("icon.png");
-                if(iconFile.exists()) {
-                    try {
-                        Texture tex = new Texture(iconFile);
-                        return new TextureRegion(tex);
-                    } catch(Exception e) {}
+            if(expandDisabled && currentTab == 1) {
+                if(disabledList.getChildren().isEmpty() || disabledList != modListContainer) {
+                    disabledList.clearChildren();
+                    modListContainer = disabledList;
+                    updateVisibleMods();
                 }
-            }
-        }
-        
-        String key = mod.name.toLowerCase();
-        if(modIcons.containsKey(key)) {
-            return modIcons.get(key);
-        }
-        
-        return null;
-    }
-
-    void installMod(ModInfo mod) {
-        if(mod.repo.isEmpty()) {
-            Vars.ui.showErrorMessage("No repository found");
-            return;
-        }
-        
-        Vars.ui.showInfo("[cyan]Downloading " + mod.name + "...");
-        
-        Core.app.post(() -> {
-            HttpURLConnection conn = null;
-            try {
-                String[] repoParts = mod.repo.split("/");
-                if(repoParts.length < 2) {
-                    Core.app.post(() -> Vars.ui.showErrorMessage("Invalid repository"));
-                    return;
-                }
-                
-                String owner = repoParts[0];
-                String repo = repoParts[1];
-                
-                String releaseUrl = "https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest";
-                conn = (HttpURLConnection) new URL(releaseUrl).openConnection();
-                conn.setRequestProperty("User-Agent", "ModInfo+");
-                conn.setRequestProperty("Authorization", "token " + getNextToken());
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-                
-                if(conn.getResponseCode() != 200) {
-                    Core.app.post(() -> Vars.ui.showErrorMessage("No releases found"));
-                    return;
-                }
-                
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder json = new StringBuilder();
-                String line;
-                while((line = reader.readLine()) != null) json.append(line);
-                reader.close();
-                
-                JsonValue release = new JsonReader().parse(json.toString());
-                JsonValue assets = release.get("assets");
-                
-                String downloadUrl = null;
-                String fileName = null;
-                
-                if(assets != null) {
-                    for(JsonValue asset : assets) {
-                        String name = asset.getString("name", "");
-                        if(name.endsWith(".jar")) {
-                            downloadUrl = asset.getString("browser_download_url", "");
-                            fileName = name;
-                            break;
-                        }
-                    }
-                    
-                    if(downloadUrl == null) {
-                        for(JsonValue asset : assets) {
-                            String name = asset.getString("name", "");
-                            if(name.endsWith(".zip")) {
-                                downloadUrl = asset.getString("browser_download_url", "");
-                                fileName = name;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                if(downloadUrl == null) {
-                    Core.app.post(() -> Vars.ui.showErrorMessage("No downloadable file found"));
-                    return;
-                }
-                
-                String finalDownloadUrl = downloadUrl;
-                String finalFileName = fileName;
-                
-                HttpURLConnection downloadConn = (HttpURLConnection) new URL(finalDownloadUrl).openConnection();
-                downloadConn.setRequestProperty("User-Agent", "ModInfo+");
-                downloadConn.setConnectTimeout(30000);
-                downloadConn.setReadTimeout(30000);
-                
-                InputStream in = downloadConn.getInputStream();
-                Fi tempFile = Fi.get(System.getProperty("java.io.tmpdir")).child(finalFileName);
-                
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                OutputStream out = tempFile.write(false);
-                while((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-                out.close();
-                in.close();
-                
-                Core.app.post(() -> {
-                    try {
-                        Vars.mods.importMod(tempFile);
-                        Vars.ui.showInfo("[lime]" + mod.name + " installed!\n[lightgray]Restart to apply.");
-                        tempFile.delete();
-                        reloadMods();
-                    } catch(Exception e) {
-                        Vars.ui.showErrorMessage("Import failed: " + e.getMessage());
-                    }
-                });
-                
-            } catch(Exception e) {
-                Core.app.post(() -> Vars.ui.showErrorMessage("Download failed: " + e.getMessage()));
-            } finally {
-                if(conn != null) try { conn.disconnect(); } catch(Exception e) {}
+                disabledList.visible = true;
+            } else {
+                disabledList.visible = false;
             }
         });
-    }void showModDetails(ModInfo mod) {
-        Mods.LoadedMod installed = mod.installedMod;
-        
-        BaseDialog dialog = new BaseDialog("");
-        
-        Table main = new Table(Styles.black6);
-        main.margin(20f);
-        
-        Table header = new Table();
-        header.setBackground(Styles.black8);
+    }).fillX().pad(10f).row();
+    
+    main.button("Browse Online Mods", Icon.download, () -> {
+        currentTab = 2;
+        expandEnabled = false;
+        expandDisabled = false;
+        showBrowseDialog();
+    }).fillX().height(50f).pad(10f).row();
+    
+    ScrollPane pane = new ScrollPane(main);
+    pane.setFadeScrollBars(false);
+    browserDialog.cont.add(pane).grow();
+    browserDialog.show();
+    
+    fetchModList();
+}
+
+void showBrowseDialog() {
+    BaseDialog browse = new BaseDialog("Browse Mods");
+    browse.addCloseButton();
+    
+    Table main = new Table(Tex.pane);
+    
+    main.table(search -> {
+        search.image(Icon.zoom).size(32f).padRight(8f);
+        TextField searchBrowse = new TextField();
+        searchBrowse.setMessageText("Search online mods...");
+        searchBrowse.changed(() -> {
+            searchQuery = searchBrowse.getText().toLowerCase();
+            currentPage = 0;
+            applyFilter();
+            updateBrowseMods();
+        });
+        search.add(searchBrowse).growX().height(45f);
+    }).fillX().pad(10f).row();
+    
+    Label browseStatus = new Label("");
+    main.add(browseStatus).pad(8f).row();
+    
+    Table browseList = new Table();
+    ScrollPane browsePane = new ScrollPane(browseList);
+    browsePane.setFadeScrollBars(false);
+    main.add(browsePane).grow().row();
+    
+    paginationBar = new Table();
+    buildPaginationBar();
+    main.add(paginationBar).fillX().padTop(10f).row();
+    
+    browse.cont.add(main).grow();
+    browse.show();
+    
+    modListContainer = browseList;
+    statusLabel = browseStatus;
+    fetchRemoteMods();
+}
+
+void updateBrowseMods() {
+    updateVisibleMods();
+}
+
+void buildPaginationBar() {
+    if(paginationBar == null) return;
+    paginationBar.clearChildren();
+    paginationBar.button("<", () -> {
+        if(currentPage > 0) {
+            currentPage--;
+            updateVisibleMods();
+        }
+    }).size(60f, 50f).disabled(b -> currentPage == 0).padRight(10f);
+    
+    paginationBar.add().growX();
+    paginationBar.label(() -> "Page " + (currentPage + 1) + "/" + Math.max(1, getMaxPage() + 1)).pad(5f);
+    paginationBar.add().growX();
+    
+    paginationBar.button(">", () -> {
+        if(currentPage < getMaxPage()) {
+            currentPage++;
+            updateVisibleMods();
+        }
+    }).size(60f, 50f).disabled(b -> currentPage >= getMaxPage()).padLeft(10f);
+}
+
+void applyFilter() {
+    filteredMods.clear();
+    if(searchQuery.isEmpty()) {
+        filteredMods.addAll(allMods);
+    } else {
+        for(ModInfo mod : allMods) {
+            if(mod.name.toLowerCase().contains(searchQuery) || 
+                mod.author.toLowerCase().contains(searchQuery) ||
+                mod.description.toLowerCase().contains(searchQuery)) {
+                filteredMods.add(mod);
+            }
+        }
+    }
+    applySort();
+}
+
+void applySort() {
+    if(sortMode.equals("updated")) {
+        filteredMods.sort((a, b) -> Long.compare(b.lastUpdatedTime, a.lastUpdatedTime));
+    } else if(sortMode.equals("stars")) {
+        filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
+    } else {
+        filteredMods.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+    }
+    updateVisibleMods();
+}
+
+void updateVisibleMods() {
+    if(modListContainer == null) return;
+    modListContainer.clearChildren();
+    int start = currentPage * modsPerPage;
+    int end = Math.min(start + modsPerPage, filteredMods.size);
+    
+    if(filteredMods.isEmpty()) {
+        modListContainer.add("[scarlet]No mods found").pad(30f);
+    } else {
+        for(int i = start; i < end; i++) {
+            buildModRow(modListContainer, filteredMods.get(i));
+        }
+    }
+    updateStatusLabel("Showing " + filteredMods.size + " mods");
+    if(currentTab == 2) buildPaginationBar();
+}
+
+void updateStatusLabel(String text) {
+    if(statusLabel != null) statusLabel.setText("[lightgray]" + text);
+}
+
+int getMaxPage() {
+    return Math.max(0, (filteredMods.size - 1) / modsPerPage);
+}void fetchModList() {
+    updateStatusLabel("[cyan]Loading enabled mods...");
+    Core.app.post(() -> {
+        allMods.clear();
+        for(Mods.LoadedMod mod : Vars.mods.list()) {
+            if(!mod.enabled()) continue;
+            ModInfo info = new ModInfo();
+            if(mod.meta != null) {
+                info.name = mod.meta.displayName != null ? mod.meta.displayName : mod.meta.name;
+                info.author = mod.meta.author;
+                info.description = mod.meta.description;
+                info.version = mod.meta.version;
+                info.hasJava = mod.meta.java;
+                info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
+                info.repo = mod.meta.repo != null ? mod.meta.repo : "";
+            } else {
+                info.name = mod.name;
+            }
+            info.installedMod = mod;
+            info.isInstalled = true;
+            allMods.add(info);
+        }
+        Core.app.post(() -> {
+            currentPage = 0;
+            applyFilter();
+        });
+    });
+}
+
+void fetchDisabledMods() {
+    updateStatusLabel("[cyan]Loading disabled mods...");
+    Core.app.post(() -> {
+        allMods.clear();
+        for(Mods.LoadedMod mod : Vars.mods.list()) {
+            if(mod.enabled()) continue;
+            ModInfo info = new ModInfo();
+            if(mod.meta != null) {
+                info.name = mod.meta.displayName != null ? mod.meta.displayName : mod.meta.name;
+                info.author = mod.meta.author;
+                info.description = mod.meta.description;
+                info.version = mod.meta.version;
+                info.hasJava = mod.meta.java;
+                info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
+                info.repo = mod.meta.repo != null ? mod.meta.repo : "";
+            } else {
+                info.name = mod.name;
+            }
+            info.installedMod = mod;
+            info.isInstalled = true;
+            allMods.add(info);
+        }
+        Core.app.post(() -> {
+            currentPage = 0;
+            applyFilter();
+        });
+    });
+}
+
+void fetchRemoteMods() {
+    updateStatusLabel("[cyan]Loading online mods...");
+    Core.app.post(() -> {
+        try {
+            String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
+            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+            conn.setRequestProperty("Authorization", "token " + getNextToken());
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            
+            if(conn.getResponseCode() != 200) {
+                Core.app.post(() -> updateStatusLabel("[scarlet]Failed to load"));
+                return;
+            }
+            
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while((line = reader.readLine()) != null) response.append(line);
+            reader.close();
+            
+            Seq<ModInfo> mods = parseModList(response.toString());
+            mods.sort(m -> -m.stars);
+            
+            Core.app.post(() -> {
+                allMods = mods;
+                currentPage = 0;
+                applyFilter();
+            });
+        } catch(Exception ex) {
+            Core.app.post(() -> updateStatusLabel("[scarlet]Failed: " + ex.getMessage()));
+        }
+    });
+}
+
+Seq<ModInfo> parseModList(String json) {
+    Seq<ModInfo> mods = new Seq<>();
+    try {
+        JsonValue root = new JsonReader().parse(json);
+        for(JsonValue modJson : root) {
+            ModInfo mod = new ModInfo();
+            mod.repo = modJson.getString("repo", "");
+            mod.name = modJson.getString("name", "Unknown");
+            mod.author = modJson.getString("author", "Unknown");
+            mod.description = modJson.getString("description", "");
+            mod.version = modJson.getString("minGameVersion", "?");
+            mod.lastUpdated = modJson.getString("lastUpdated", "");
+            mod.stars = modJson.getInt("stars", 0);
+            mod.hasJava = modJson.getBoolean("hasJava", false);
+            mod.hasScripts = modJson.getBoolean("hasScripts", false);
+            mod.lastUpdatedTime = parseTimestamp(mod.lastUpdated);
+            
+            for(Mods.LoadedMod installed : Vars.mods.list()) {
+                if(installed.meta != null && installed.meta.repo != null && 
+                   installed.meta.repo.equalsIgnoreCase(mod.repo)) {
+                    mod.isInstalled = true;
+                    break;
+                }
+            }
+            
+            if(!mod.repo.isEmpty() && !mod.name.isEmpty()) {
+                mods.add(mod);
+            }
+        }
+    } catch(Exception e) {
+        Log.err("Parse error", e);
+    }
+    return mods;
+}
+
+long parseTimestamp(String dateStr) {
+    try {
+        String[] parts = dateStr.split("T")[0].split("-");
+        return Long.parseLong(parts[0]) * 10000000000L + 
+               Long.parseLong(parts[1]) * 100000000L + 
+               Long.parseLong(parts[2]) * 1000000L;
+    } catch(Exception e) {
+        return 0;
+    }
+}
+
+String formatDate(String dateStr) {
+    try {
+        String[] parts = dateStr.split("T")[0].split("-");
+        return parts[1] + "/" + parts[2] + "/" + parts[0];
+    } catch(Exception e) {
+        return dateStr;
+    }
+}
+
+void buildModRow(Table table, ModInfo mod) {
+    Mods.LoadedMod installed = mod.installedMod;
+    
+    table.table(Tex.button, row -> {
+        row.left();
         
         TextureRegion icon = getModIcon(mod, installed);
         if(icon != null) {
-            header.image(icon).size(96f).pad(12f);
+            row.image(icon).size(64f).padLeft(10f).padRight(12f);
         } else {
-            header.image(Icon.box).size(96f).color(Color.gray).pad(12f);
+            row.image(Icon.box).size(64f).color(Color.gray).padLeft(10f).padRight(12f);
         }
         
-        header.table(title -> {
-            title.left().defaults().left();
-            title.add("[accent]" + mod.name).style(Styles.outlineLabel).padBottom(4f).row();
-            title.add("[lightgray]v" + mod.version).row();
-        }).growX().padLeft(12f);
+        row.table(info -> {
+            info.left().defaults().left();
+            
+            info.table(title -> {
+                title.left();
+                title.add("[accent]" + mod.name).style(Styles.outlineLabel).padRight(8f);
+                
+                TextureRegion badge = getBadge(mod);
+                if(badge != null && badge.found()) {
+                    title.image(badge).size(28f, 18f).padRight(4f);
+                } else {
+                    String badgeText = mod.hasJava ? "[#b07219][[JAVA]" : "[#f1e05a][[JS]";
+                    title.add(badgeText).style(Styles.outlineLabel);
+                }
+                
+                if(mod.stars >= 10) {
+                    title.add(" [yellow]\u2605" + mod.stars).padLeft(6f);
+                }
+            }).row();
+            
+            info.add("[lightgray]by " + mod.author + " [gray]| v" + mod.version).padTop(4f).row();
+            
+            if(!mod.description.isEmpty()) {
+                Label desc = new Label(mod.description.length() > 80 ? 
+                    mod.description.substring(0, 77) + "..." : mod.description);
+                desc.setWrap(true);
+                desc.setColor(Color.lightGray);
+                info.add(desc).width(350f).padTop(4f).row();
+            }
+            
+        }).growX().pad(10f);
         
-        main.add(header).fillX().pad(8f).row();
-        
-        main.image().color(accentColor).height(3f).fillX().pad(8f).row();
-        
-        Table badges = new Table();
-        badges.left();
-        badges.defaults().padRight(12f).size(36f);
-        
-        if(mod.hasJava) {
-            TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
-            if(javaBadge != null) {
-                Image badge = new Image(javaBadge);
-                badge.setColor(Color.white);
-                badges.add(badge).size(44f, 28f);
+        row.table(btns -> {
+            btns.defaults().size(50f);
+            
+            if(currentTab < 2) {
+                btns.button(Icon.settings, Styles.clearNonei, () -> {
+                    showModDetails(mod);
+                }).tooltip("Details");
             } else {
-                badges.image(Icon.pencil).color(Color.valueOf("b07219"));
+                btns.button(Icon.info, Styles.clearNonei, () -> {
+                    showModDetails(mod);
+                }).tooltip("Details");
+                
+                btns.button(Icon.link, Styles.clearNonei, () -> {
+                    Core.app.openURI("https://github.com/" + mod.repo);
+                }).tooltip("GitHub");
+                
+                if(!mod.isInstalled) {
+                    btns.button(Icon.download, Styles.clearNonei, () -> {
+                        installMod(mod);
+                    }).tooltip("Install");
+                }
             }
-        } else if(mod.hasScripts) {
-            TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
-            if(jsBadge != null) {
-                Image badge = new Image(jsBadge);
-                badge.setColor(Color.white);
-                badges.add(badge).size(44f, 28f);
-            } else {
-                badges.image(Icon.wrench).color(Color.valueOf("f1e05a"));
-            }
-        }
+        }).right().padRight(10f);
         
-        badges.image(Icon.file).color(Color.valueOf("89e051"));
+    }).fillX().height(120f).pad(4f).row();
+}
+
+TextureRegion getModIcon(ModInfo mod, Mods.LoadedMod installed) {
+    if(installed != null && installed.iconTexture != null) {
+        return new TextureRegion(installed.iconTexture);
+    }
+    
+    String key = mod.name.toLowerCase();
+    if(modIcons.containsKey(key)) {
+        return modIcons.get(key);
+    }
+    
+    return null;
+}
+
+TextureRegion getBadge(ModInfo mod) {
+    return mod.hasJava ? badgeSprites.get("testmod-java-badge") : badgeSprites.get("testmod-js-badge");
+}void installMod(ModInfo mod) {
+    try {
+        Vars.ui.mods.githubImportMod(mod.repo, true);
+        Vars.ui.showInfo("Installing " + mod.name + "...");
+    } catch(Exception e) {
+        Log.err("Install error", e);
+        Vars.ui.showErrorMessage("Install failed: " + e.getMessage());
+    }
+}
+
+void showModDetails(ModInfo mod) {
+    Mods.LoadedMod installed = mod.installedMod;
+    
+    BaseDialog dialog = new BaseDialog(mod.name);
+    dialog.addCloseButton();
+    
+    Table content = new Table(Tex.pane);
+    content.margin(15f);
+    
+    TextureRegion icon = getModIcon(mod, installed);
+    if(icon != null) {
+        content.image(icon).size(80f).pad(10f).row();
+    } else {
+        content.image(Icon.box).size(80f).color(Color.gray).pad(10f).row();
+    }
+    
+    Table titleRow = new Table();
+    titleRow.add("[accent]" + mod.name).pad(5f);
+    TextureRegion badge = getBadge(mod);
+    if(badge != null && badge.found()) {
+        titleRow.image(badge).size(36f, 22f).padLeft(8f);
+    } else {
+        String badgeText = mod.hasJava ? " [#b07219][[JAVA]" : " [#f1e05a][[JS]";
+        titleRow.add(badgeText);
+    }
+    content.add(titleRow).row();
+    
+    content.add("[cyan]" + mod.author).pad(5f).row();
+    content.add("[lightgray]v" + mod.version).pad(3f).row();
+    if(mod.stars > 0) {
+        content.add("[yellow]\u2605 " + mod.stars + " stars").pad(3f).row();
+    }
+    
+    if(!mod.description.isEmpty()) {
+        Label desc = new Label(mod.description);
+        desc.setWrap(true);
+        desc.setAlignment(Align.center);
+        desc.setColor(Color.lightGray);
+        content.add(desc).width(450f).pad(10f).row();
+    }
+    
+    content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
+    
+    Table statsTable = new Table();
+    statsTable.add("[cyan]Loading stats...").pad(15f);
+    content.add(statsTable).row();
+    
+    content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
+    
+    content.table(actions -> {
+        actions.button("Open GitHub", Icon.link, () -> {
+            Core.app.openURI("https://github.com/" + mod.repo);
+        }).size(220f, 55f).pad(5f);
         
-        if(installed != null) {
-            if(mod.isServerCompatible) {
-                badges.image(Icon.host).color(Color.sky).padLeft(8f);
-            }
-            
-            if(installed.enabled()) {
-                badges.image(Icon.ok).color(enabledColor).padLeft(12f);
-            } else {
-                badges.image(Icon.cancel).color(disabledColor).padLeft(12f);
-            }
-        }
-        
-        if(mod.isInstalled) {
-            badges.image(Icon.ok).size(32f).color(enabledColor).padLeft(12f);
-        }
-        
-        main.add(badges).left().pad(8f).row();
-        
-        Table info = new Table();
-        info.left().defaults().left().pad(4f);
-        
-        if(!mod.repo.isEmpty()) {
-            info.add("[lightgray]Repository:").padRight(12f);
-            info.add("[white]" + mod.repo).row();
-        }
-        
-        main.add(info).left().fillX().pad(8f).row();
-        
-        if(!mod.repo.isEmpty()) {
-            main.image().color(accentColor).height(2f).fillX().pad(8f).row();
-            
-            Table statsTable = new Table();
-            statsTable.left().defaults().left().pad(5f);
-            statsTable.add("[lightgray]Loading stats...").colspan(2).row();
-            main.add(statsTable).left().fillX().pad(8f).row();
-            
-            loadGitHubStats(mod, statsTable);
-        }
-        
-        main.image().color(accentColor).height(2f).fillX().pad(8f).row();
-        
-        if(!mod.description.isEmpty()) {
-            main.add("[accent]Description:").left().padLeft(12f).padTop(8f).row();
-            Label desc = new Label(mod.description);
-            desc.setWrap(true);
-            desc.setColor(Color.lightGray);
-            desc.setAlignment(Align.left);
-            main.add(desc).width(500f).pad(12f).left().row();
-            main.image().color(accentColor).height(2f).fillX().pad(8f).row();
-        }
-        
-        Table actions = new Table();
-        actions.defaults().size(220f, 55f).pad(8f);
-        
-        if(!mod.repo.isEmpty()) {
-            addTooltip(actions.button("Open GitHub", Icon.link, () -> {
-                Core.app.openURI("https://github.com/" + mod.repo);
-            }), "Open in browser");
-        }
-        
-        if(installed != null) {
-            addTooltip(actions.button(installed.enabled() ? "Disable" : "Enable", 
-                          installed.enabled() ? Icon.cancel : Icon.ok, () -> {
-                toggleModState(mod, installed);
-                dialog.hide();
-            }), installed.enabled() ? "Disable mod" : "Enable mod");
-            
-            actions.row();
-            
-            addTooltip(actions.button("Delete", Icon.trash, () -> {
-                confirmDelete(mod, installed);
-                dialog.hide();
-            }).update(b -> b.getLabel().setColor(Color.scarlet)), "Delete mod");
-        } else if(!mod.repo.isEmpty() && !mod.isInstalled) {
-            addTooltip(actions.button("Download", Icon.download, () -> {
+        if(installed == null && !mod.isInstalled) {
+            actions.button("Install", Icon.download, () -> {
                 installMod(mod);
                 dialog.hide();
-            }), "Download and install");
+            }).size(220f, 55f).pad(5f);
         }
-        
-        main.add(actions).fillX().pad(8f).row();
-        
-        addTooltip(main.button("Close", Icon.cancel, () -> {
-            dialog.hide();
-        }).size(180f, 45f).pad(8f), "Close dialog");
-        
-        ScrollPane pane = new ScrollPane(main);
-        dialog.cont.add(pane).size(580f, 680f);
-        dialog.show();
+    }).row();
+    
+    ScrollPane pane = new ScrollPane(content);
+    dialog.cont.add(pane).grow();
+    dialog.show();
+    
+    if(!mod.repo.isEmpty()) {
+        loadGitHubStats(mod, statsTable);
     }
+}
 
-    void loadGitHubStats(ModInfo mod, Table statsTable) {
-        String key = mod.repo;
+void loadGitHubStats(ModInfo mod, Table statsTable) {
+    String key = mod.repo;
+    if(statsCache.containsKey(key)) {
+        displayStats(statsTable, mod, statsCache.get(key));
+        return;
+    }
+    
+    fetchModStats(mod, stats -> {
+        if(stats != null) {
+            statsCache.put(key, stats);
+            displayStats(statsTable, mod, stats);
+        } else {
+            displayStatsError(statsTable, mod);
+        }
+    });
+}
+
+void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
+    Core.app.post(() -> {
+        statsTable.clearChildren();
+        statsTable.defaults().left().pad(6f);
         
-        if(statsCache.containsKey(key)) {
-            Long lastFetch = lastStatsFetch.get(key, 0L);
-            if(Time.millis() - lastFetch < CACHE_TIME) {
-                displayStats(statsTable, mod, statsCache.get(key));
+        statsTable.add("[yellow]\u2605 Stars:").padRight(15f);
+        statsTable.add("[white]" + stats.stars).row();
+        
+        statsTable.add("[lime]\u2193 Downloads:").padRight(15f);
+        statsTable.add("[white]" + stats.downloads).row();
+        
+        statsTable.add("[cyan]\u26A1 Releases:").padRight(15f);
+        statsTable.add("[white]" + stats.releases).row();
+        
+        statsTable.add("[lightgray]Updated:").padRight(15f);
+        statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
+    });
+}
+
+void displayStatsError(Table statsTable, ModInfo mod) {
+    Core.app.post(() -> {
+        statsTable.clearChildren();
+        statsTable.defaults().left().pad(6f);
+        
+        statsTable.add("[scarlet]Stats unavailable").colspan(2).row();
+        statsTable.add("[lightgray]Updated:").padRight(15f);
+        statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
+    });
+}
+
+void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
+    Core.app.post(() -> {
+        HttpURLConnection repoConn = null;
+        HttpURLConnection relConn = null;
+        try {
+            String repoUrl = mod.repo;
+            String[] parts = repoUrl.split("/");
+            if(parts.length < 2) {
+                callback.get(null);
                 return;
             }
-        }
-        
-        if(currentlyLoadingStats.contains(key)) return;
-        
-        currentlyLoadingStats.add(key);
-        
-        fetchModStats(mod, stats -> {
-            currentlyLoadingStats.remove(key);
-            if(stats != null) {
-                statsCache.put(key, stats);
-                lastStatsFetch.put(key, Time.millis());
-                displayStats(statsTable, mod, stats);
-            } else {
-                displayStatsError(statsTable, mod);
+            
+            String owner = parts[0];
+            String repo = parts[1];
+            
+            repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
+            repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+            repoConn.setRequestProperty("Authorization", "token " + getNextToken());
+            repoConn.setConnectTimeout(10000);
+            repoConn.setReadTimeout(10000);
+            
+            if(repoConn.getResponseCode() != 200) {
+                callback.get(null);
+                return;
             }
-        });
-    }
-
-    void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
-        Core.app.post(() -> {
-            statsTable.clearChildren();
-            statsTable.defaults().left().pad(5f);
             
-            statsTable.add("[yellow]★ Stars:").padRight(12f);
-            statsTable.add("[white]" + stats.stars).row();
+            BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
+            StringBuilder repoData = new StringBuilder();
+            String line;
+            while((line = repoReader.readLine()) != null) repoData.append(line);
+            repoReader.close();
             
-            statsTable.add("[lime]↓ Downloads:").padRight(12f);
-            statsTable.add("[white]" + stats.downloads).row();
+            ModStats stats = new ModStats();
             
-            statsTable.add("[cyan]⚡ Releases:").padRight(12f);
-            statsTable.add("[white]" + stats.releases).row();
-            
-            if(!mod.lastUpdated.isEmpty()) {
-                statsTable.add("[lightgray]Updated:").padRight(12f);
-                statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
-            }
-        });
-    }
-
-    void displayStatsError(Table statsTable, ModInfo mod) {
-        Core.app.post(() -> {
-            statsTable.clearChildren();
-            statsTable.defaults().left().pad(5f);
-            
-            statsTable.add("[scarlet]Stats unavailable").colspan(2).row();
-            if(!mod.lastUpdated.isEmpty()) {
-                statsTable.add("[lightgray]Updated:").padRight(12f);
-                statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
-            }
-        });
-    }
-
-    void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
-        Core.app.post(() -> {
-            HttpURLConnection repoConn = null;
-            HttpURLConnection relConn = null;
             try {
-                String[] parts = mod.repo.split("/");
-                if(parts.length < 2) {
-                    callback.get(null);
-                    return;
-                }
+                JsonValue repoJson = new JsonReader().parse(repoData.toString());
+                stats.stars = repoJson.getInt("stargazers_count", 0);
+            } catch(Exception e) {
+                Log.err("Parse repo", e);
+            }
+            
+            try {
+                relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
+                relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+                relConn.setRequestProperty("Authorization", "token " + getNextToken());
+                relConn.setConnectTimeout(10000);
+                relConn.setReadTimeout(10000);
                 
-                String owner = parts[0];
-                String repo = parts[1];
-                String token = getNextToken();
-                
-                try {
-                    Thread.sleep((long)(Math.random() * 500 + 200));
-                } catch(Exception e) {}
-                
-                repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
-                repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                repoConn.setRequestProperty("Authorization", "token " + token);
-                repoConn.setConnectTimeout(10000);
-                repoConn.setReadTimeout(10000);
-                
-                int code = repoConn.getResponseCode();
-                if(code == 403) {
-                    markTokenRateLimited();
-                    callback.get(null);
-                    return;
-                }
-                if(code != 200) {
-                    callback.get(null);
-                    return;
-                }
-                
-                BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
-                StringBuilder repoData = new StringBuilder();
-                String line;
-                while((line = repoReader.readLine()) != null) repoData.append(line);
-                repoReader.close();
-                
-                ModStats stats = new ModStats();
-                
-                try {
-                    JsonValue repoJson = new JsonReader().parse(repoData.toString());
-                    stats.stars = repoJson.getInt("stargazers_count", 0);
-                } catch(Exception e) {}
-                
-                try {
-                    Thread.sleep((long)(Math.random() * 500 + 200));
-                } catch(Exception e) {}
-                
-                try {
-                    relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
-                    relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                    relConn.setRequestProperty("Authorization", "token " + token);
-                    relConn.setConnectTimeout(10000);
-                    relConn.setReadTimeout(10000);
+                if(relConn.getResponseCode() == 200) {
+                    BufferedReader relReader = new BufferedReader(new InputStreamReader(relConn.getInputStream()));
+                    StringBuilder relData = new StringBuilder();
+                    while((line = relReader.readLine()) != null) relData.append(line);
+                    relReader.close();
                     
-                    if(relConn.getResponseCode() == 200) {
-                        BufferedReader relReader = new BufferedReader(new InputStreamReader(relConn.getInputStream()));
-                        StringBuilder relData = new StringBuilder();
-                        while((line = relReader.readLine()) != null) relData.append(line);
-                        relReader.close();
-                        
-                        JsonValue releasesJson = new JsonReader().parse(relData.toString());
-                        stats.releases = releasesJson.size;
-                        
-                        int totalDownloads = 0;
-                        for(JsonValue release : releasesJson) {
-                            JsonValue assets = release.get("assets");
-                            if(assets != null) {
-                                for(JsonValue asset : assets) {
-                                    totalDownloads += asset.getInt("download_count", 0);
-                                }
+                    JsonValue releasesJson = new JsonReader().parse(relData.toString());
+                    stats.releases = releasesJson.size;
+                    
+                    int totalDownloads = 0;
+                    for(JsonValue release : releasesJson) {
+                        JsonValue assets = release.get("assets");
+                        if(assets != null) {
+                            for(JsonValue asset : assets) {
+                                totalDownloads += asset.getInt("download_count", 0);
                             }
                         }
-                        stats.downloads = totalDownloads;
                     }
-                } catch(Exception e) {}
-                
-                callback.get(stats);
-                
+                    stats.downloads = totalDownloads;
+                }
             } catch(Exception e) {
-                callback.get(null);
-            } finally {
-                if(repoConn != null) try { repoConn.disconnect(); } catch(Exception e) {}
-                if(relConn != null) try { relConn.disconnect(); } catch(Exception e) {}
+                Log.err("Parse releases", e);
             }
-        });
-    }
-
-    class ModInfo {
+            
+            callback.get(stats);
+            
+        } catch(Exception e) {
+            Log.err("GitHub API", e);
+            callback.get(null);
+        } finally {
+            if(repoConn != null) try { repoConn.disconnect(); } catch(Exception e) {}
+            if(relConn != null) try { relConn.disconnect(); } catch(Exception e) {}
+        }
+    });
+}class ModInfo {
         String repo = "";
         String name = "";
         String author = "";
         String description = "";
         String version = "";
         String lastUpdated = "";
+        long lastUpdatedTime = 0;
         int stars = 0;
-        int downloads = 0;
-        int releases = 0;
         boolean hasJava = false;
         boolean hasScripts = false;
-        boolean isServerCompatible = false;
         boolean isInstalled = false;
-        boolean isEnabled = false;
         Mods.LoadedMod installedMod = null;
     }
     
