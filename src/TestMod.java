@@ -174,85 +174,66 @@ public class TestMod extends Mod {
             searchQuery = searchField.getText().toLowerCase();
             currentPage = 0;
             applyFilter();
-            updateVisibleMods();
         });
-        search.add(searchField).growX().height(45f);
-        search.button(Icon.cancel, Styles.cleari, () -> {
-            searchField.setText("");
-            searchQuery = "";
-            applyFilter();
-        }).size(45f).visible(() -> !searchField.getText().isEmpty());
-    }).fillX().pad(10f).row();
+        search.add(searchField).growX().height(45f).pad(10f);
+    }).fillX().row();
     
     statusLabel = new Label("");
     main.add(statusLabel).pad(8f).row();
     
-    main.table(categories -> {
-        categories.left().defaults().left().fillX();
-        
-        categories.table(enabledHeader -> {
-            enabledHeader.button(b -> {
-                b.left();
-                b.image(expandEnabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
-                b.add("[accent]Enabled Mods").style(Styles.outlineLabel);
-            }, Styles.clearTogglei, () -> {
-                expandEnabled = !expandEnabled;
-                if(expandEnabled && currentTab != 0) {
-                    currentTab = 0;
-                    fetchModList();
+    Table enabledSection = new Table();
+    Table disabledSection = new Table();
+    Table browseSection = new Table();
+    
+    main.collapser(enabledSection, true, () -> {
+        enabledSection.clearChildren();
+        enabledSection.table(list -> {
+            for(ModInfo mod : allMods) {
+                if(mod.installedMod != null && mod.installedMod.enabled()) {
+                    buildModRow(list, mod);
                 }
-            }).growX().height(50f).checked(b -> expandEnabled);
-        }).fillX().row();
-        
-        Table enabledList = new Table();
-        categories.add(enabledList).fillX().padLeft(20f).row();
-        
-        categories.table(disabledHeader -> {
-            disabledHeader.button(b -> {
-                b.left();
-                b.image(expandDisabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
-                b.add("[lightgray]Disabled Mods").style(Styles.outlineLabel);
-            }, Styles.clearTogglei, () -> {
-                expandDisabled = !expandDisabled;
-                if(expandDisabled && currentTab != 1) {
-                    currentTab = 1;
-                    fetchDisabledMods();
-                }
-            }).growX().height(50f).checked(b -> expandDisabled);
-        }).fillX().row();
-        
-        Table disabledList = new Table();
-        categories.add(disabledList).fillX().padLeft(20f).row();
-        
-        categories.update(() -> {
-            if(expandEnabled && currentTab == 0) {
-                if(enabledList.getChildren().isEmpty() || enabledList != modListContainer) {
-                    enabledList.clearChildren();
-                    modListContainer = enabledList;
-                    updateVisibleMods();
-                }
-                enabledList.visible = true;
-            } else {
-                enabledList.visible = false;
             }
-            
-            if(expandDisabled && currentTab == 1) {
-                if(disabledList.getChildren().isEmpty() || disabledList != modListContainer) {
-                    disabledList.clearChildren();
-                    modListContainer = disabledList;
-                    updateVisibleMods();
+        }).fillX();
+    }).fillX().padTop(4f);
+    
+    main.button(t -> {
+        t.left();
+        t.add("[accent]Enabled Mods").style(Styles.outlineLabel);
+    }, Styles.clearTogglei, () -> {
+        expandEnabled = !expandEnabled;
+        if(expandEnabled) {
+            currentTab = 0;
+            fetchModList();
+        }
+    }).growX().height(50f).checked(b -> expandEnabled).row();
+    
+    main.collapser(disabledSection, () -> expandDisabled, () -> {
+        disabledSection.clearChildren();
+        disabledSection.table(list -> {
+            for(ModInfo mod : allMods) {
+                if(mod.installedMod != null && !mod.installedMod.enabled()) {
+                    buildModRow(list, mod);
                 }
-                disabledList.visible = true;
-            } else {
-                disabledList.visible = false;
             }
-        });
-    }).fillX().pad(10f).row();
+        }).fillX();
+    }).fillX().padTop(4f);
+    
+    main.button(t -> {
+        t.left();
+        t.add("[lightgray]Disabled Mods").style(Styles.outlineLabel);
+    }, Styles.clearTogglei, () -> {
+        expandDisabled = !expandDisabled;
+        if(expandDisabled) {
+            currentTab = 1;
+            fetchDisabledMods();
+        }
+    }).growX().height(50f).checked(b -> expandDisabled).row();
     
     main.button("Browse Online Mods", Icon.download, () -> {
-        currentTab = 2;
         expandEnabled = false;
         expandDisabled = false;
+        currentTab = 2;
+        fetchRemoteMods();
         showBrowseDialog();
     }).fillX().height(50f).pad(10f).row();
     
@@ -262,6 +243,7 @@ public class TestMod extends Mod {
     browserDialog.show();
     
     fetchModList();
+    fetchDisabledMods();
 }
 
 void showBrowseDialog() {
@@ -278,16 +260,15 @@ void showBrowseDialog() {
             searchQuery = searchBrowse.getText().toLowerCase();
             currentPage = 0;
             applyFilter();
-            updateBrowseMods();
         });
-        search.add(searchBrowse).growX().height(45f);
-    }).fillX().pad(10f).row();
+        search.add(searchBrowse).growX().height(45f).pad(10f);
+    }).fillX().row();
     
     Label browseStatus = new Label("");
     main.add(browseStatus).pad(8f).row();
     
-    Table browseList = new Table();
-    ScrollPane browsePane = new ScrollPane(browseList);
+    modListContainer = new Table();
+    ScrollPane browsePane = new ScrollPane(modListContainer);
     browsePane.setFadeScrollBars(false);
     main.add(browsePane).grow().row();
     
@@ -298,13 +279,7 @@ void showBrowseDialog() {
     browse.cont.add(main).grow();
     browse.show();
     
-    modListContainer = browseList;
     statusLabel = browseStatus;
-    fetchRemoteMods();
-}
-
-void updateBrowseMods() {
-    updateVisibleMods();
 }
 
 void buildPaginationBar() {
@@ -336,8 +311,7 @@ void applyFilter() {
     } else {
         for(ModInfo mod : allMods) {
             if(mod.name.toLowerCase().contains(searchQuery) || 
-                mod.author.toLowerCase().contains(searchQuery) ||
-                mod.description.toLowerCase().contains(searchQuery)) {
+                (mod.description != null && mod.description.toLowerCase().contains(searchQuery))) {
                 filteredMods.add(mod);
             }
         }
@@ -379,6 +353,22 @@ void updateStatusLabel(String text) {
 
 int getMaxPage() {
     return Math.max(0, (filteredMods.size - 1) / modsPerPage);
+}
+
+void reloadMods() {
+    allMods.clear();
+    filteredMods.clear();
+    statsCache.clear();
+    lastStatsFetch.clear();
+    currentlyLoadingStats.clear();
+    lastRefreshTime = Time.millis();
+    if(currentTab == 0) {
+        fetchModList();
+    } else if(currentTab == 1) {
+        fetchDisabledMods();
+    } else {
+        fetchRemoteMods();
+    }
 }void fetchModList() {
     updateStatusLabel("[cyan]Loading enabled mods...");
     Core.app.post(() -> {
