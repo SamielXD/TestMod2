@@ -193,7 +193,7 @@ public class TestMod extends Mod {
         categories.table(enabledHeader -> {
             enabledHeader.button(b -> {
                 b.left();
-                b.image(() -> expandEnabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
+                b.image(expandEnabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
                 b.add("[accent]Enabled Mods").style(Styles.outlineLabel);
             }, Styles.clearTogglei, () -> {
                 expandEnabled = !expandEnabled;
@@ -210,7 +210,7 @@ public class TestMod extends Mod {
         categories.table(disabledHeader -> {
             disabledHeader.button(b -> {
                 b.left();
-                b.image(() -> expandDisabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
+                b.image(expandDisabled ? Icon.downOpen : Icon.rightOpen).size(24f).padRight(8f);
                 b.add("[lightgray]Disabled Mods").style(Styles.outlineLabel);
             }, Styles.clearTogglei, () -> {
                 expandDisabled = !expandDisabled;
