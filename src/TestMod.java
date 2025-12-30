@@ -742,7 +742,17 @@ public class TestMod extends Mod {
                 conn.setReadTimeout(5000);
                 
                 if(conn.getResponseCode() == 200) {
-                    Pixmap pixmap = new Pixmap(conn.getInputStream().readAllBytes());
+                    InputStream inputStream = conn.getInputStream();
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    int nRead;
+                    byte[] data = new byte[16384];
+                    while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+                        buffer.write(data, 0, nRead);
+                    }
+                    buffer.flush();
+                    byte[] imageBytes = buffer.toByteArray();
+                    inputStream.close();
+                    Pixmap pixmap = new Pixmap(imageBytes);
                     Texture tex = new Texture(pixmap);
                     pixmap.dispose();
                     TextureRegion region = new TextureRegion(tex);
