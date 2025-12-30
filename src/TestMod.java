@@ -1,3 +1,4 @@
+
 import arc.*;
 import arc.func.*;
 import arc.graphics.*;
@@ -138,18 +139,21 @@ public class TestMod extends Mod {
     }
 
     void loadModIcons(){
-        for(Mod mod : Vars.mods.list()){
-            if(mod.iconTexture != null){
-                modIcons.put(mod.name, new TextureRegion(mod.iconTexture));
+        for(mindustry.mod.Mods.LoadedMod mod : Vars.mods.list()){
+            if(mod.icon != null){
+                modIcons.put(
+                    mod.meta.displayName,
+                    mod.icon
+                );
             }
         }
     }
 
     void replaceModsButton(){
         for(Element e : Vars.ui.menuGroup.getChildren()){
-            if(e instanceof Button){
-                Button b = (Button)e;
-                if(b.getText() != null && b.getText().toString().equals(Core.bundle.get("mods"))){
+            if(e instanceof TextButton){
+                TextButton b = (TextButton)e;
+                if(b.getText().toString().equals(Core.bundle.get("mods"))){
                     b.clicked(this::showBrowser);
                 }
             }
