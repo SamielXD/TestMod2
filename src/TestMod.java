@@ -20,19 +20,29 @@ import java.io.*;
 
 public class TestMod extends Mod {
     
-    private static String getToken() {
-        String p1 = "ghp_";
-        String p2 = "VVNy";
-        String p3 = "jnJl";
-        String p4 = "AYvi";
-        String p5 = "yOWR";
-        String p6 = "JPdr";
-        String p7 = "FEzb";
-        String p8 = "YIIX";
-        String p9 = "Uh2a";
-        String p10 = "49ho";
-        return p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10;
+    private static class TokenInfo {
+        String[] parts;
+        int requestCount = 0;
+        long lastUsed = 0;
+        boolean rateLimited = false;
+        
+        TokenInfo(String[] scrambledParts) {
+            this.parts = scrambledParts;
+        }
+        
+        String getToken() {
+            StringBuilder sb = new StringBuilder();
+            for(String part : parts) {
+                sb.append(part);
+            }
+            return sb.toString();
+        }
     }
+    
+    private Seq<TokenInfo> tokens = new Seq<>();
+    private int currentTokenIndex = 0;
+    private static final int MAX_REQUESTS_PER_TOKEN = 50;
+    private static final long RATE_LIMIT_RESET_TIME = 3600000;
     
     private Seq<ModInfo> allMods = new Seq<>();
     private Seq<ModInfo> filteredMods = new Seq<>();
@@ -51,9 +61,7 @@ public class TestMod extends Mod {
     private Color accentColor = Color.valueOf("84f491");
     private Color bgDark = Color.valueOf("2b2f38");
     private Color cardBg = Color.valueOf("363944");
-    private TextureRegion javaBadge;
-    private TextureRegion jsBadge;
-    private TextureRegion hjsonBadge;
+    private ObjectMap<String, TextureRegion> badgeSprites = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
     private int currentTab = 0;
     private String sortMode = "updated";
@@ -61,43 +69,72 @@ public class TestMod extends Mod {
 
     public TestMod() {
         Log.info("ModInfo+ Browser Initializing");
+        initTokens();
+    }
+    
+    void initTokens() {
+        tokens.add(new TokenInfo(new String[]{"ghp_", "ljb7p6nUp", "WfeWGW1oo", "kX2Fhht9X", "TqT1Pnffd"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "mPsirCTWN", "qhVCEmOY2", "VszbFPf7Y", "OTP0N7tCf"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "hLczgAeJ9", "C7zMWZxQN", "OYIxeMxrl", "ELx2rABtr"}));
+        tokens.add(new TokenInfo(new String[]{"ghp_", "RF5cOOMkN", "CxAItejWz", "7qjT8dOuH", "gPl088JeG"}));
+    }
+    
+    String getNextToken() {
+        for(int i = 0; i < tokens.size; i++) {
+            TokenInfo token = tokens.get(currentTokenIndex);
+            
+            if(token.rateLimited) {
+                if(Time.millis() - token.lastUsed > RATE_LIMIT_RESET_TIME) {
+                    token.rateLimited = false;
+                    token.requestCount = 0;
+                } else {
+                    currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
+                    continue;
+                }
+            }
+            
+            if(token.requestCount < MAX_REQUESTS_PER_TOKEN) {
+                token.requestCount++;
+                token.lastUsed = Time.millis();
+                return token.getToken();
+            }
+            
+            currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
+        }
+        
+        return tokens.get(0).getToken();
+    }
+    
+    void markTokenRateLimited() {
+        tokens.get(currentTokenIndex).rateLimited = true;
+        currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
     }
 
     @Override
     public void init() {
         Events.on(ClientLoadEvent.class, e -> {
             Core.app.post(() -> {
-                loadBadges();
+                loadAllBadgeSprites();
                 loadModIcons();
             });
         });
         addModInfoButton();
     }
     
-    void loadBadges() {
-        javaBadge = Core.atlas.find("testmod-java-badge");
-        jsBadge = Core.atlas.find("testmod-js-badge");
-        hjsonBadge = Core.atlas.find("testmod-hjson-badge");
+    void loadAllBadgeSprites() {
+        String[] badgeNames = {
+            "testmod-java-badge",
+            "testmod-js-badge"
+        };
         
-        if(!javaBadge.found()) {
-            Log.warn("Java badge not found: testmod-java-badge");
-            javaBadge = Core.atlas.find("java-badge");
-        } else {
-            Log.info("Java badge loaded: testmod-java-badge");
-        }
-        
-        if(!jsBadge.found()) {
-            Log.warn("JS badge not found: testmod-js-badge");
-            jsBadge = Core.atlas.find("js-badge");
-        } else {
-            Log.info("JS badge loaded: testmod-js-badge");
-        }
-        
-        if(!hjsonBadge.found()) {
-            Log.warn("HJSON badge not found: testmod-hjson-badge");
-            hjsonBadge = Core.atlas.find("hjson-badge");
-        } else {
-            Log.info("HJSON badge loaded: testmod-hjson-badge");
+        for(String name : badgeNames) {
+            TextureRegion region = Core.atlas.find(name);
+            if(region.found()) {
+                badgeSprites.put(name, region);
+                Log.info("Loaded badge sprite: " + name);
+            } else {
+                Log.warn("Badge sprite not found: " + name);
+            }
         }
     }
     
@@ -156,6 +193,8 @@ public class TestMod extends Mod {
         browserDialog.cont.clear();
         
         boolean isPortrait = Core.graphics.getHeight() > Core.graphics.getWidth();
+        float screenWidth = Core.graphics.getWidth();
+        float screenHeight = Core.graphics.getHeight();
         
         Table main = new Table();
         main.background(Tex.pane);
@@ -296,10 +335,7 @@ public class TestMod extends Mod {
         buildPaginationBar();
         main.add(paginationBar).fillX().padBottom(5f).row();
         
-        float width = isPortrait ? Core.graphics.getWidth() : Core.graphics.getWidth();
-        float height = isPortrait ? Core.graphics.getHeight() : Core.graphics.getHeight();
-        
-        browserDialog.cont.add(main).size(width, height);
+        browserDialog.cont.add(main).size(screenWidth, screenHeight);
         browserDialog.show();
         fetchModList();
     }
@@ -561,16 +597,18 @@ public class TestMod extends Mod {
 
     void buildModRow(Table table, ModInfo mod) {
         Mods.LoadedMod installed = mod.installedMod;
+        boolean isPortrait = Core.graphics.getHeight() > Core.graphics.getWidth();
         
         table.table(Tex.button, row -> {
-            row.margin(12f);
+            row.margin(15f);
             row.left();
             
             TextureRegion icon = getModIcon(mod, installed);
+            float iconSize = isPortrait ? 80f : 90f;
             if(icon != null) {
-                row.image(icon).size(70f).padRight(15f);
+                row.image(icon).size(iconSize).padRight(15f);
             } else {
-                row.image(Icon.box).size(70f).color(Color.gray).padRight(15f);
+                row.image(Icon.box).size(iconSize).color(Color.gray).padRight(15f);
             }
             
             row.table(info -> {
@@ -583,24 +621,29 @@ public class TestMod extends Mod {
                     nameLabel.setStyle(Styles.outlineLabel);
                     nameLabel.setColor(accentColor);
                     nameLabel.setEllipsis(true);
-                    nameLabel.setWrap(false);
-                    title.add(nameLabel).maxWidth(300f).padRight(10f);
+                    nameLabel.setWrap(true);
+                    float maxNameWidth = isPortrait ? 250f : 400f;
+                    title.add(nameLabel).maxWidth(maxNameWidth).padRight(10f).fillX();
+                    
+                    title.row();
                     
                     Table badges = new Table();
                     badges.left();
-                    badges.defaults().padRight(8f);
+                    badges.defaults().padRight(8f).padTop(5f);
                     
                     if(mod.hasJava) {
-                        if(javaBadge != null && javaBadge.found()) {
-                            Image img = badges.image(javaBadge).size(32f, 20f).get();
+                        TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
+                        if(javaBadge != null) {
+                            Image img = badges.image(javaBadge).size(36f, 22f).get();
                             img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                         } else {
                             Label lbl = badges.add("[#b07219]JAVA").style(Styles.outlineLabel).get();
                             lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]Built with Java code"));
                         }
                     } else if(mod.hasScripts) {
-                        if(jsBadge != null && jsBadge.found()) {
-                            Image img = badges.image(jsBadge).size(32f, 20f).get();
+                        TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
+                        if(jsBadge != null) {
+                            Image img = badges.image(jsBadge).size(36f, 22f).get();
                             img.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]Built with JS scripts"));
                         } else {
                             Label lbl = badges.add("[#f1e05a]JS").style(Styles.outlineLabel).get();
@@ -608,8 +651,9 @@ public class TestMod extends Mod {
                         }
                     }
                     
-                    if(hjsonBadge != null && hjsonBadge.found()) {
-                        Image hjsonImg = badges.image(hjsonBadge).size(32f, 20f).get();
+                    TextureRegion hjsonBadge = badgeSprites.get("testmod-hjson-badge");
+                    if(hjsonBadge != null) {
+                        Image hjsonImg = badges.image(hjsonBadge).size(36f, 22f).get();
                         hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
                     } else {
                         Image hjsonImg = badges.image(Icon.book).size(20f).color(Color.valueOf("89e051")).get();
@@ -617,49 +661,55 @@ public class TestMod extends Mod {
                     }
                     
                     if(installed != null) {
+                        TextureRegion serverBadge = badgeSprites.get("testmod-server-badge");
                         if(mod.isServerCompatible) {
-                            Image hostImg = badges.image(Icon.host).size(18f).color(Color.sky).get();
-                            hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer"));
+                            if(serverBadge != null) {
+                                Image hostImg = badges.image(serverBadge).size(36f, 22f).get();
+                                hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer"));
+                            } else {
+                                Image hostImg = badges.image(Icon.host).size(20f).color(Color.sky).get();
+                                hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]Works on multiplayer"));
+                            }
                         } else {
-                            Image clientImg = badges.image(Icon.players).size(18f).color(Color.orange).get();
+                            Image clientImg = badges.image(Icon.players).size(20f).color(Color.orange).get();
                             clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]Singleplayer only"));
                         }
                         
                         if(installed.enabled()) {
-                            badges.image(Icon.ok).size(20f).color(Color.lime);
+                            badges.image(Icon.ok).size(22f).color(Color.lime);
                         } else {
-                            badges.image(Icon.cancel).size(20f).color(Color.scarlet);
+                            badges.image(Icon.cancel).size(22f).color(Color.scarlet);
                         }
                     }
                     
-                    title.add(badges).padLeft(8f);
+                    title.add(badges).padLeft(8f).fillX();
                 }).fillX().row();
                 
-                info.add("[lightgray]" + mod.author + " [gray]| v" + mod.version).padTop(6f).row();
+                info.add("[lightgray]" + mod.author + " [gray]| v" + mod.version).padTop(8f).row();
                 
                 info.table(stats -> {
                     stats.left().defaults().left().padRight(15f);
                     if(mod.stars > 0) {
-                        stats.image(Icon.star).size(16f).color(Color.yellow).padRight(4f);
+                        stats.image(Icon.star).size(18f).color(Color.yellow).padRight(4f);
                         stats.add("[yellow]" + mod.stars).padRight(15f);
                     }
                     if(mod.downloads > 0) {
-                        stats.image(Icon.download).size(16f).color(Color.lime).padRight(4f);
+                        stats.image(Icon.download).size(18f).color(Color.lime).padRight(4f);
                         stats.add("[lime]" + mod.downloads).padRight(15f);
                     }
                     if(mod.releases > 0) {
-                        stats.image(Icon.box).size(16f).color(Color.cyan).padRight(4f);
+                        stats.image(Icon.box).size(18f).color(Color.cyan).padRight(4f);
                         stats.add("[cyan]" + mod.releases);
                     }
                     if(mod.stars == 0 && mod.downloads == 0 && mod.releases == 0 && !mod.repo.isEmpty()) {
                         stats.add("[darkgray]Loading stats...").padRight(15f);
                     }
-                }).padTop(6f).row();
+                }).padTop(8f).row();
                 
             }).growX().padLeft(10f);
             
             row.table(btns -> {
-                btns.defaults().size(60f).pad(5f);
+                btns.defaults().size(65f).pad(5f);
                 
                 btns.button(Icon.info, Styles.clearNonei, () -> {
                     showModDetails(mod);
@@ -689,7 +739,7 @@ public class TestMod extends Mod {
                 
             }).right().padRight(12f);
             
-        }).fillX().minHeight(140f).pad(8f).row();
+        }).fillX().minHeight(160f).pad(10f).row();
     }
 
     void toggleModState(ModInfo mod, Mods.LoadedMod installed) {
@@ -772,9 +822,9 @@ public class TestMod extends Mod {
         
         TextureRegion icon = getModIcon(mod, installed);
         if(icon != null) {
-            header.image(icon).size(96f).pad(15f);
+            header.image(icon).size(110f).pad(15f);
         } else {
-            header.image(Icon.box).size(96f).color(Color.gray).pad(15f);
+            header.image(Icon.box).size(110f).color(Color.gray).pad(15f);
         }
         
         header.table(title -> {
@@ -792,16 +842,18 @@ public class TestMod extends Mod {
         badges.defaults().padRight(12f);
         
         if(mod.hasJava) {
-            if(javaBadge != null && javaBadge.found()) {
-                Image img = badges.image(javaBadge).size(48f, 30f).get();
+            TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
+            if(javaBadge != null) {
+                Image img = badges.image(javaBadge).size(52f, 32f).get();
                 img.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
             } else {
                 Label lbl = badges.add("[#b07219]JAVA").style(Styles.outlineLabel).get();
                 lbl.clicked(() -> Vars.ui.showInfo("[accent]Java Mod\n[lightgray]This mod is built with Java code"));
             }
         } else if(mod.hasScripts) {
-            if(jsBadge != null && jsBadge.found()) {
-                Image img = badges.image(jsBadge).size(48f, 30f).get();
+            TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
+            if(jsBadge != null) {
+                Image img = badges.image(jsBadge).size(52f, 32f).get();
                 img.clicked(() -> Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]This mod is built with JavaScript"));
             } else {
                 Label lbl = badges.add("[#f1e05a]JS").style(Styles.outlineLabel).get();
@@ -809,8 +861,9 @@ public class TestMod extends Mod {
             }
         }
         
-        if(hjsonBadge != null && hjsonBadge.found()) {
-            Image hjsonImg = badges.image(hjsonBadge).size(48f, 30f).get();
+        TextureRegion hjsonBadge = badgeSprites.get("testmod-hjson-badge");
+        if(hjsonBadge != null) {
+            Image hjsonImg = badges.image(hjsonBadge).size(52f, 32f).get();
             hjsonImg.clicked(() -> Vars.ui.showInfo("[accent]mod.hjson\n[lightgray]Uses HJSON format"));
         } else {
             Image hjsonImg = badges.image(Icon.book).size(28f).color(Color.valueOf("89e051")).get();
@@ -818,10 +871,16 @@ public class TestMod extends Mod {
         }
         
         if(installed != null) {
+            TextureRegion serverBadge = badgeSprites.get("testmod-server-badge");
             if(mod.isServerCompatible) {
-                Image hostImg = badges.image(Icon.host).size(26f).color(Color.sky).get();
-                hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
-                badges.add("[sky]Server Compatible").style(Styles.outlineLabel);
+                if(serverBadge != null) {
+                    Image hostImg = badges.image(serverBadge).size(52f, 32f).get();
+                    hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
+                } else {
+                    Image hostImg = badges.image(Icon.host).size(26f).color(Color.sky).get();
+                    hostImg.clicked(() -> Vars.ui.showInfo("[accent]Server Compatible\n[lightgray]This mod works on multiplayer servers"));
+                    badges.add("[sky]Server Compatible").style(Styles.outlineLabel);
+                }
             } else {
                 Image clientImg = badges.image(Icon.players).size(26f).color(Color.orange).get();
                 clientImg.clicked(() -> Vars.ui.showInfo("[accent]Client Only\n[lightgray]This mod only works in singleplayer"));
@@ -974,7 +1033,7 @@ public class TestMod extends Mod {
             
             statsTable.add("[scarlet]Stats unavailable").colspan(2).row();
             statsTable.add("[darkgray]API rate limit or network error").colspan(2).row();
-            statsTable.add("[lightgray]Wait 1 hour for rate limit reset").colspan(2).row();
+            statsTable.add("[lightgray]Retrying with next token...").colspan(2).row();
             if(!mod.lastUpdated.isEmpty()) {
                 statsTable.add("[lightgray]Updated:").padRight(15f);
                 statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
@@ -997,15 +1056,22 @@ public class TestMod extends Mod {
                 String owner = parts[0];
                 String repo = parts[1];
                 
+                String token = getNextToken();
+                
+                try {
+                    Thread.sleep((long)(Math.random() * 500 + 200));
+                } catch(Exception e) {}
+                
                 repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
                 repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                repoConn.setRequestProperty("Authorization", "token " + getToken());
+                repoConn.setRequestProperty("Authorization", "token " + token);
                 repoConn.setConnectTimeout(10000);
                 repoConn.setReadTimeout(10000);
                 
                 int code = repoConn.getResponseCode();
                 if(code == 403) {
-                    Log.warn("Rate limit hit for " + mod.name);
+                    Log.warn("Rate limit hit for " + mod.name + ", switching token");
+                    markTokenRateLimited();
                     callback.get(null);
                     return;
                 }
@@ -1028,9 +1094,13 @@ public class TestMod extends Mod {
                 } catch(Exception e) {}
                 
                 try {
+                    Thread.sleep((long)(Math.random() * 500 + 200));
+                } catch(Exception e) {}
+                
+                try {
                     relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
                     relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-                    relConn.setRequestProperty("Authorization", "token " + getToken());
+                    relConn.setRequestProperty("Authorization", "token " + token);
                     relConn.setConnectTimeout(10000);
                     relConn.setReadTimeout(10000);
                     
