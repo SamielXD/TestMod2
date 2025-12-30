@@ -102,6 +102,21 @@ public class TestMod extends Mod {
         tokens.get(currentTokenIndex).rateLimited = true;
         currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
     }
+    
+    void githubGet(String url, Cons<String> success, Runnable fail) {
+        Http.get(url)
+            .header("User-Agent", "Mindustry-ModBrowser")
+            .header("Authorization", "token " + getNextToken())
+            .timeout(15000)
+            .error(e -> {
+                markTokenRateLimited();
+                Core.app.post(fail);
+            })
+            .submit(res -> {
+                String text = res.getResultAsString();
+                Core.app.post(() -> success.get(text));
+            });
+    }
 
     @Override
     public void init() {
@@ -393,18 +408,10 @@ void detectCapabilities(ModInfo info, Mods.LoadedMod mod) {
     info.hasContent = false;
     info.serverCompatible = false;
     
-    if(mod.root != null) {
-        if(mod.root.child("scripts").exists()) {
-            info.hasScripts = true;
-        }
-        
-        if(mod.root.child("content").exists()) {
-            info.hasContent = true;
-        }
-    }
+    info.hasJava = mod.main != null;
     
-    if(mod.main != null) {
-        info.hasJava = true;
+    if(mod.root != null && mod.root.child("scripts").exists()) {
+        info.hasScripts = true;
     }
     
     if(mod.meta != null && !mod.meta.hidden) {
@@ -414,48 +421,16 @@ void detectCapabilities(ModInfo info, Mods.LoadedMod mod) {
 
 void fetchRemoteMods() {
     updateStatusLabel("[cyan]Loading online mods...");
-    Core.app.post(() -> {
-        try {
-            String url = "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json";
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
-            conn.setRequestProperty("Authorization", "token " + getNextToken());
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            
-            int responseCode = conn.getResponseCode();
-            if(responseCode == 403) {
-                markTokenRateLimited();
-                Core.app.post(() -> updateStatusLabel("[scarlet]Rate limited, trying next token..."));
-                fetchRemoteMods();
-                return;
-            }
-            
-            if(responseCode != 200) {
-                Core.app.post(() -> updateStatusLabel("[scarlet]Failed to load"));
-                return;
-            }
-            
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while((line = reader.readLine()) != null) response.append(line);
-            reader.close();
-            
-            Seq<ModInfo> mods = parseModList(response.toString());
-            mods.sort((a, b) -> Integer.compare(b.stars, a.stars));
-            
-            Core.app.post(() -> {
-                allMods = mods;
-                currentPage = 0;
-                applyFilter();
-                updateVisibleMods();
-            });
-        } catch(Exception ex) {
-            Core.app.post(() -> updateStatusLabel("[scarlet]Failed: " + ex.getMessage()));
-        }
-    });
+    
+    githubGet(
+        "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
+        json -> {
+            allMods = parseModList(json);
+            applyFilter();
+            updateVisibleMods();
+        },
+        () -> updateStatusLabel("[scarlet]Failed to load mod list")
+    );
 }
 
 Seq<ModInfo> parseModList(String json) {
@@ -523,26 +498,41 @@ void buildModRow(Table table, ModInfo mod) {
                 title.add("[accent]" + mod.name).style(Styles.outlineLabel).padRight(8f);
                 
                 Table badges = new Table();
-                badges.left();
+                badges.left().defaults().padRight(8f);
                 
                 if(mod.hasJava) {
+                    Table javaBadgeBtn = new Table(Styles.black6);
                     if(javaBadge != null && javaBadge.found()) {
-                        badges.image(javaBadge).size(28f, 18f).padRight(4f);
+                        javaBadgeBtn.image(javaBadge).size(28f, 18f).pad(4f);
                     } else {
-                        badges.add("[#b07219]JAVA").style(Styles.outlineLabel).padRight(4f);
+                        javaBadgeBtn.add("[#b07219]JAVA").style(Styles.outlineLabel).pad(4f);
                     }
+                    javaBadgeBtn.clicked(() -> {
+                        Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]Uses compiled Java code");
+                    });
+                    badges.add(javaBadgeBtn);
                 }
                 
                 if(mod.hasScripts) {
+                    Table jsBadgeBtn = new Table(Styles.black6);
                     if(jsBadge != null && jsBadge.found()) {
-                        badges.image(jsBadge).size(28f, 18f).padRight(4f);
+                        jsBadgeBtn.image(jsBadge).size(28f, 18f).pad(4f);
                     } else {
-                        badges.add("[#f1e05a]JS").style(Styles.outlineLabel).padRight(4f);
+                        jsBadgeBtn.add("[#f1e05a]JS").style(Styles.outlineLabel).pad(4f);
                     }
+                    jsBadgeBtn.clicked(() -> {
+                        Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]Uses scripts");
+                    });
+                    badges.add(jsBadgeBtn);
                 }
                 
                 if(mod.serverCompatible) {
-                    badges.image(Icon.host).size(20f).color(Color.lime).padRight(4f);
+                    Table serverBadgeBtn = new Table(Styles.black6);
+                    serverBadgeBtn.image(Icon.host).size(20f).color(Color.royal).pad(4f);
+                    serverBadgeBtn.clicked(() -> {
+                        Vars.ui.showInfo("[royal]Server Compatible\n[lightgray]Can run on multiplayer servers");
+                    });
+                    badges.add(serverBadgeBtn);
                 }
                 
                 title.add(badges);
@@ -669,23 +659,43 @@ void showModDetails(ModInfo mod) {
     titleRow.add("[accent]" + mod.name).pad(5f);
     
     Table badges = new Table();
+    badges.defaults().padRight(8f);
+    
     if(mod.hasJava) {
+        Table javaBadgeBtn = new Table(Styles.black6);
         if(javaBadge != null && javaBadge.found()) {
-            badges.image(javaBadge).size(36f, 22f).padRight(6f);
+            javaBadgeBtn.image(javaBadge).size(36f, 22f).pad(4f);
         } else {
-            badges.add("[#b07219]JAVA").padRight(6f);
+            javaBadgeBtn.add("[#b07219]JAVA").pad(4f);
         }
+        javaBadgeBtn.clicked(() -> {
+            Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]Uses compiled Java code");
+        });
+        badges.add(javaBadgeBtn);
     }
+    
     if(mod.hasScripts) {
+        Table jsBadgeBtn = new Table(Styles.black6);
         if(jsBadge != null && jsBadge.found()) {
-            badges.image(jsBadge).size(36f, 22f).padRight(6f);
+            jsBadgeBtn.image(jsBadge).size(36f, 22f).pad(4f);
         } else {
-            badges.add("[#f1e05a]JS").padRight(6f);
+            jsBadgeBtn.add("[#f1e05a]JS").pad(4f);
         }
+        jsBadgeBtn.clicked(() -> {
+            Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]Uses scripts");
+        });
+        badges.add(jsBadgeBtn);
     }
+    
     if(mod.serverCompatible) {
-        badges.image(Icon.host).size(24f).color(Color.lime);
+        Table serverBadgeBtn = new Table(Styles.black6);
+        serverBadgeBtn.image(Icon.host).size(24f).color(Color.royal).pad(4f);
+        serverBadgeBtn.clicked(() -> {
+            Vars.ui.showInfo("[royal]Server Compatible\n[lightgray]Can run on multiplayer servers");
+        });
+        badges.add(serverBadgeBtn);
     }
+    
     titleRow.add(badges);
     content.add(titleRow).row();
     
@@ -739,14 +749,54 @@ void showModDetails(ModInfo mod) {
         return;
     }
     
-    fetchModStats(mod, stats -> {
-        if(stats != null) {
-            statsCache.put(key, stats);
-            displayStats(statsTable, mod, stats);
-        } else {
-            displayStatsError(statsTable, mod);
+    githubGet(
+        "https://api.github.com/repos/" + mod.repo,
+        json -> {
+            ModStats stats = parseRepoStats(json);
+            statsCache.put(mod.repo, stats);
+            
+            githubGet(
+                "https://api.github.com/repos/" + mod.repo + "/releases",
+                relJson -> {
+                    parseReleaseStats(stats, relJson);
+                    displayStats(statsTable, mod, stats);
+                },
+                () -> displayStats(statsTable, mod, stats)
+            );
+        },
+        () -> displayStatsError(statsTable, mod)
+    );
+}
+
+ModStats parseRepoStats(String json) {
+    ModStats stats = new ModStats();
+    try {
+        JsonValue repoJson = new JsonReader().parse(json);
+        stats.stars = repoJson.getInt("stargazers_count", 0);
+    } catch(Exception e) {
+        Log.err("Parse repo", e);
+    }
+    return stats;
+}
+
+void parseReleaseStats(ModStats stats, String json) {
+    try {
+        JsonValue releasesJson = new JsonReader().parse(json);
+        stats.releases = releasesJson.size;
+        
+        int totalDownloads = 0;
+        for(JsonValue release : releasesJson) {
+            JsonValue assets = release.get("assets");
+            if(assets != null) {
+                for(JsonValue asset : assets) {
+                    totalDownloads += asset.getInt("download_count", 0);
+                }
+            }
         }
-    });
+        stats.downloads = totalDownloads;
+    } catch(Exception e) {
+        Log.err("Parse releases", e);
+    }
 }
 
 void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
@@ -777,6 +827,102 @@ void displayStatsError(Table statsTable, ModInfo mod) {
         if(!mod.lastUpdated.isEmpty()) {
             statsTable.add("[lightgray]Updated:").padRight(15f);
             statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
+        }
+    });
+}
+
+void fetchModStats(ModInfo mod, Cons<ModStats> callback) {
+    Core.app.post(() -> {
+        HttpURLConnection repoConn = null;
+        HttpURLConnection relConn = null;
+        try {
+            String repoUrl = mod.repo;
+            String[] parts = repoUrl.split("/");
+            if(parts.length < 2) {
+                callback.get(null);
+                return;
+            }
+            
+            String owner = parts[0];
+            String repo = parts[1];
+            
+            repoConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo).openConnection();
+            repoConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+            repoConn.setRequestProperty("Authorization", "token " + getNextToken());
+            repoConn.setConnectTimeout(10000);
+            repoConn.setReadTimeout(10000);
+            
+            int repoCode = repoConn.getResponseCode();
+            if(repoCode == 403) {
+                markTokenRateLimited();
+                callback.get(null);
+                return;
+            }
+            
+            if(repoCode != 200) {
+                callback.get(null);
+                return;
+            }
+            
+            BufferedReader repoReader = new BufferedReader(new InputStreamReader(repoConn.getInputStream()));
+            StringBuilder repoData = new StringBuilder();
+            String line;
+            while((line = repoReader.readLine()) != null) repoData.append(line);
+            repoReader.close();
+            
+            ModStats stats = new ModStats();
+            
+            try {
+                JsonValue repoJson = new JsonReader().parse(repoData.toString());
+                stats.stars = repoJson.getInt("stargazers_count", 0);
+            } catch(Exception e) {
+                Log.err("Parse repo", e);
+            }
+            
+            try {
+                relConn = (HttpURLConnection) new URL("https://api.github.com/repos/" + owner + "/" + repo + "/releases").openConnection();
+                relConn.setRequestProperty("User-Agent", "Mindustry-ModBrowser");
+                relConn.setRequestProperty("Authorization", "token " + getNextToken());
+                relConn.setConnectTimeout(10000);
+                relConn.setReadTimeout(10000);
+                
+                int relCode = relConn.getResponseCode();
+                if(relCode == 403) {
+                    markTokenRateLimited();
+                }
+                
+                if(relCode == 200) {
+                    BufferedReader relReader = new BufferedReader(new InputStreamReader(relConn.getInputStream()));
+                    StringBuilder relData = new StringBuilder();
+                    while((line = relReader.readLine()) != null) relData.append(line);
+                    relReader.close();
+                    
+                    JsonValue releasesJson = new JsonReader().parse(relData.toString());
+                    stats.releases = releasesJson.size;
+                    
+                    int totalDownloads = 0;
+                    for(JsonValue release : releasesJson) {
+                        JsonValue assets = release.get("assets");
+                        if(assets != null) {
+                            for(JsonValue asset : assets) {
+                                totalDownloads += asset.getInt("download_count", 0);
+                            }
+                        }
+                    }
+                    stats.downloads = totalDownloads;
+                }
+            } catch(Exception e) {
+                Log.err("Parse releases", e);
+            }
+            
+            callback.get(stats);
+            
+        } catch(Exception e) {
+            Log.err("GitHub API", e);
+            callback.get(null);
+        } finally {
+            if(repoConn != null) try { repoConn.disconnect(); } catch(Exception e) {}
+            if(relConn != null) try { relConn.disconnect(); } catch(Exception e) {}
         }
     });
 }
