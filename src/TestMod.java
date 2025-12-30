@@ -196,13 +196,13 @@ public class TestMod extends Mod {
         return name.substring(0, maxLength) + "...";
     }
     
-    Cell<Actor> addTooltip(Cell<Actor> cell, String text) {
+    <T extends Element> Cell<T> addTooltip(Cell<T> cell, String text) {
         cell.get().addListener(new InputListener() {
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                 return true;
             }
             
-            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
+            public void enter(InputEvent event, float x, float y, int pointer, Element fromActor) {
                 if(pointer == -1) {
                     Vars.ui.showInfoToast(text, 2f);
                 }
@@ -240,7 +240,10 @@ public class TestMod extends Mod {
         header.setBackground(Styles.black8);
         
         header.table(top -> {
-            top.add("[accent]Mods").style(Styles.outlineLabel).fontSize(1.2f).padLeft(16f).growX().left();
+            Label titleLabel = new Label("[accent]Mods");
+            titleLabel.setStyle(Styles.outlineLabel);
+            titleLabel.setFontScale(1.2f);
+            top.add(titleLabel).padLeft(16f).growX().left();
             addTooltip(top.button(Icon.cancel, Styles.clearNonei, () -> browserDialog.hide())
                 .size(45f).pad(8f), "Close");
         }).fillX().height(60f).row();
@@ -308,7 +311,10 @@ public class TestMod extends Mod {
         header.setBackground(Styles.black8);
         
         header.table(left -> {
-            left.add("[accent]Mods").style(Styles.outlineLabel).fontSize(1.3f).padLeft(20f).growX().left();
+            Label titleLabel = new Label("[accent]Mods");
+            titleLabel.setStyle(Styles.outlineLabel);
+            titleLabel.setFontScale(1.3f);
+            left.add(titleLabel).padLeft(20f).growX().left();
         }).growX();
         
         header.table(tabs -> {
