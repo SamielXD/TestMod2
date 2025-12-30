@@ -184,6 +184,13 @@ public class TestMod extends Mod {
         });
     }
     
+    String truncateName(String name, int maxLength) {
+        if(name.length() <= maxLength) {
+            return name;
+        }
+        return name.substring(0, maxLength) + "...";
+    }
+    
     void showEnhancedBrowser() {
         if(browserDialog != null) {
             browserDialog.show();
@@ -614,50 +621,72 @@ public class TestMod extends Mod {
             row.table(info -> {
                 info.left().defaults().left().growX();
                 
-                Label nameLabel = new Label(mod.name);
+                String displayName = truncateName(mod.name, 15);
+                Label nameLabel = new Label(displayName);
                 nameLabel.setStyle(Styles.outlineLabel);
                 nameLabel.setColor(Color.white);
-                nameLabel.setEllipsis(true);
-                nameLabel.setWrap(false);
-                info.add(nameLabel).left().padBottom(2f).row();
+                info.add(nameLabel).left().padBottom(2f);
+                if(mod.name.length() > 15) {
+                    info.add().width(4f);
+                    info.button("...", Styles.transt, () -> {
+                        Vars.ui.showInfo(mod.name);
+                    }).size(30f, 20f).tooltip(mod.name);
+                }
+                info.row();
                 
                 Label versionLabel = new Label(mod.version);
                 versionLabel.setColor(Color.lightGray);
-                versionLabel.setEllipsis(true);
-                versionLabel.setWrap(false);
                 info.add(versionLabel).left().row();
                 
             }).growX().padLeft(8f).padRight(8f);
             
             row.table(badges -> {
-                badges.right().defaults().size(28f).pad(2f);
+                badges.right().defaults().size(32f).pad(4f);
                 
-                if(installed != null && installed.enabled()) {
-                    badges.image(Icon.ok).color(Color.lime).tooltip("Enabled");
+                if(installed != null) {
+                    if(installed.enabled()) {
+                        badges.button(Icon.ok, Styles.clearTogglei, () -> {
+                            toggleModState(mod, installed);
+                        }).size(32f).color(Color.lime).tooltip("Enabled - Click to disable");
+                    } else {
+                        badges.button(Icon.cancel, Styles.clearTogglei, () -> {
+                            toggleModState(mod, installed);
+                        }).size(32f).color(Color.scarlet).tooltip("Disabled - Click to enable");
+                    }
                 }
                 
                 if(mod.hasJava) {
                     TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
                     if(javaBadge != null) {
-                        badges.image(javaBadge).size(32f, 20f).tooltip("Java");
+                        badges.button(Styles.clearTogglei, () -> {
+                            Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]This mod uses Java code");
+                        }).size(36f, 24f).get().getStyle().imageUp = new TextureRegionDrawable(javaBadge);
                     } else {
-                        badges.image(Icon.units).color(Color.valueOf("b07219")).tooltip("Java");
+                        badges.button(Icon.units, Styles.clearTogglei, () -> {
+                            Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]This mod uses Java code");
+                        }).size(32f).color(Color.valueOf("b07219")).tooltip("Java");
                     }
                 } else if(mod.hasScripts) {
                     TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
                     if(jsBadge != null) {
-                        badges.image(jsBadge).size(32f, 20f).tooltip("JavaScript");
+                        badges.button(Styles.clearTogglei, () -> {
+                            Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]This mod uses JavaScript");
+                        }).size(36f, 24f).get().getStyle().imageUp = new TextureRegionDrawable(jsBadge);
                     } else {
-                        badges.image(Icon.logic).color(Color.valueOf("f1e05a")).tooltip("JavaScript");
+                        badges.button(Icon.settings, Styles.clearTogglei, () -> {
+                            Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]This mod uses JavaScript");
+                        }).size(32f).color(Color.valueOf("f1e05a")).tooltip("JavaScript");
                     }
                 }
                 
-                badges.image(Icon.book).color(Color.valueOf("89e051")).tooltip("HJSON");
+                badges.button(Icon.book, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[#89e051]HJSON Config\n[lightgray]This mod uses HJSON configuration");
+                }).size(32f).color(Color.valueOf("89e051")).tooltip("HJSON");
                 
-                if(installed != null) {
-                    if(mod.isServerCompatible) {
-                        badges.image(Icon.host).color(Color.sky).tooltip("Multiplayer");
-                    }
+                if(installed != null && mod.isServerCompatible) {
+                    badges.button(Icon.host, Styles.clearTogglei, () -> {
+                        Vars.ui.showInfo("[sky]Multiplayer Compatible\n[lightgray]Works on servers");
+                    }).size(32f).color(Color.sky).tooltip("Multiplayer");
                 }
                 
             }).right().padRight(8f);
@@ -807,39 +836,55 @@ public class TestMod extends Mod {
         
         Table badges = new Table();
         badges.left();
-        badges.defaults().padRight(10f);
+        badges.defaults().padRight(12f).size(32f);
         
         if(mod.hasJava) {
             TextureRegion javaBadge = badgeSprites.get("testmod-java-badge");
             if(javaBadge != null) {
-                badges.image(javaBadge).size(44f, 28f).tooltip("Java Mod");
+                badges.button(Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]This mod uses Java code");
+                }).size(44f, 28f).get().getStyle().imageUp = new TextureRegionDrawable(javaBadge);
             } else {
-                badges.add("[#b07219]JAVA").style(Styles.outlineLabel);
+                badges.button(Icon.units, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[#b07219]Java Mod\n[lightgray]This mod uses Java code");
+                }).size(32f).color(Color.valueOf("b07219")).tooltip("Java");
             }
         } else if(mod.hasScripts) {
             TextureRegion jsBadge = badgeSprites.get("testmod-js-badge");
             if(jsBadge != null) {
-                badges.image(jsBadge).size(44f, 28f).tooltip("JS Mod");
+                badges.button(Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]This mod uses JavaScript");
+                }).size(44f, 28f).get().getStyle().imageUp = new TextureRegionDrawable(jsBadge);
             } else {
-                badges.add("[#f1e05a]JS").style(Styles.outlineLabel);
+                badges.button(Icon.settings, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[#f1e05a]JavaScript Mod\n[lightgray]This mod uses JavaScript");
+                }).size(32f).color(Color.valueOf("f1e05a")).tooltip("JavaScript");
             }
         }
         
-        badges.image(Icon.book).size(24f).color(Color.valueOf("89e051")).tooltip("HJSON");
+        badges.button(Icon.book, Styles.clearTogglei, () -> {
+            Vars.ui.showInfo("[#89e051]HJSON Config\n[lightgray]This mod uses HJSON configuration");
+        }).size(32f).color(Color.valueOf("89e051")).tooltip("HJSON");
         
         if(installed != null) {
             if(mod.isServerCompatible) {
-                badges.image(Icon.host).size(24f).color(Color.sky).tooltip("Server Compatible");
+                badges.button(Icon.host, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[sky]Multiplayer Compatible\n[lightgray]Works on servers");
+                }).size(32f).color(Color.sky).tooltip("Server Compatible");
             } else {
-                badges.image(Icon.players).size(24f).color(Color.orange).tooltip("Client Only");
+                badges.button(Icon.players, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[orange]Client Only\n[lightgray]Does not work on servers");
+                }).size(32f).color(Color.orange).tooltip("Client Only");
             }
             
             if(installed.enabled()) {
-                badges.image(Icon.ok).size(26f).color(Color.lime).padLeft(8f);
-                badges.add("[lime]Enabled").style(Styles.outlineLabel);
+                badges.button(Icon.ok, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[lime]Enabled\n[lightgray]This mod is currently active");
+                }).size(32f).color(Color.lime).padLeft(12f);
             } else {
-                badges.image(Icon.cancel).size(26f).color(Color.scarlet).padLeft(8f);
-                badges.add("[scarlet]Disabled").style(Styles.outlineLabel);
+                badges.button(Icon.cancel, Styles.clearTogglei, () -> {
+                    Vars.ui.showInfo("[scarlet]Disabled\n[lightgray]This mod is currently inactive");
+                }).size(32f).color(Color.scarlet).padLeft(12f);
             }
         }
         
