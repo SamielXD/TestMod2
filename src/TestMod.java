@@ -147,7 +147,9 @@ public class TestMod extends Mod {
                 blur.slider(0f, 10f, 0.5f, uiBlur, v -> {
                     uiBlur = v;
                 }).width(200f);
-                blur.add(() -> String.format("%.1f", uiBlur)).padLeft(10f);
+                Label blurLabel = new Label("");
+                blurLabel.update(() -> blurLabel.setText(String.format("%.1f", uiBlur)));
+                blur.add(blurLabel).padLeft(10f);
             }).pad(5f).row();
             
             table.table(scale -> {
@@ -155,7 +157,9 @@ public class TestMod extends Mod {
                 scale.slider(0.5f, 2f, 0.1f, uiScale, v -> {
                     uiScale = v;
                 }).width(200f);
-                scale.add(() -> String.format("%.1f", uiScale)).padLeft(10f);
+                Label scaleLabel = new Label("");
+                scaleLabel.update(() -> scaleLabel.setText(String.format("%.1f", uiScale)));
+                scale.add(scaleLabel).padLeft(10f);
             }).pad(5f).row();
             
             table.add("[lightgray]Version: 1.0").pad(10f);
@@ -315,17 +319,15 @@ public class TestMod extends Mod {
         headerContainer.add().growX();
         
         if(currentTab == 2) {
-            TextButton sortBtn = headerContainer.button(sortMode == 0 ? Icon.down : Icon.star, Styles.cleari, 35f, () -> {
+            ImageButton sortBtn = headerContainer.button(sortMode == 0 ? Icon.down : Icon.star, Styles.cleari, 35f, () -> {
                 sortMode = (sortMode + 1) % 2;
                 buildHeader();
                 applySorting();
             }).size(45f).padRight(5f).get();
-            sortBtn.getLabel().setText("");
             
-            TextButton filterBtn = headerContainer.button(Icon.filter, Styles.cleari, 35f, () -> {
+            ImageButton filterBtn = headerContainer.button(Icon.filter, Styles.cleari, 35f, () -> {
                 showFilterMenu();
             }).size(45f).padRight(5f).get();
-            filterBtn.getLabel().setText("");
         }
         
         headerContainer.button(Icon.book, Styles.cleari, 35f, () -> {
