@@ -766,12 +766,12 @@ public class TestMod extends Mod {
                     makeBadge(badges, Icon.ok, Color.lime, "Enabled", "This mod is currently active");
                 }
                 
-                if(mod.hasJava && !mod.hasScripts) {
-                    arc.scene.style.Drawable d = javaBadge != null ? javaBadge : Icon.book;
-                    makeBadge(badges, d, Color.valueOf("b07219"), "Java Mod", "Contains compiled Java code");
-                } else if(mod.hasScripts && !mod.hasJava) {
-                    arc.scene.style.Drawable d = jsBadge != null ? jsBadge : Icon.logic;
-                    makeBadge(badges, d, Color.valueOf("f1e05a"), "JavaScript Mod", "Uses Mindustry JS scripting");
+               if(mod.hasJava && !mod.hasScripts) {
+    arc.scene.style.Drawable d = javaBadge != null ? new TextureRegionDrawable(javaBadge) : Icon.book;
+    makeBadge(badges, d, Color.valueOf("b07219"), "Java Mod", "Contains compiled Java code");
+} else if(mod.hasScripts && !mod.hasJava) {
+    arc.scene.style.Drawable d = jsBadge != null ? new TextureRegionDrawable(jsBadge) : Icon.logic;
+    makeBadge(badges, d, Color.valueOf("f1e05a"), "JavaScript Mod", "Uses Mindustry JS scripting");
                 } else if(mod.hasJava && mod.hasScripts) {
                     makeBadge(badges, Icon.warning, Color.orange, "Mixed Runtime", "Uses both Java and JavaScript");
                 }
