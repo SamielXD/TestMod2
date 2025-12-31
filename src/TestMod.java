@@ -644,14 +644,25 @@ public class TestMod extends Mod {
             extractDir.mkdirs();
             
             arc.files.ZipFi zip = new arc.files.ZipFi(zipFile);
-            zip.walk(file -> {
-                if(file.name().equals(zipFile.name())) return;
+            zip.walk(entry -> {
+                if(entry.name().equals(zipFile.name())) return;
                 
-                arc.files.Fi output = extractDir.child(file.path().replace(zip.file.name() + "/", ""));
-                if(file.isDirectory()) {
+                String entryPath = entry.path();
+                String zipName = zipFile.nameWithoutExtension();
+                
+                if(entryPath.startsWith(zipName + "/")) {
+                    entryPath = entryPath.substring(zipName.length() + 1);
+                }
+                
+                if(entryPath.isEmpty()) return;
+                
+                arc.files.Fi output = extractDir.child(entryPath);
+                
+                if(entry.isDirectory()) {
                     output.mkdirs();
                 } else {
-                    output.writeBytes(file.readBytes());
+                    output.parent().mkdirs();
+                    output.writeBytes(entry.readBytes());
                 }
             });
             
