@@ -355,14 +355,18 @@ public class TestMod extends Mod {
                 buildHeader();
                 applySorting();
             }).size(45f).padRight(5f).get();
-            sortBtn.tooltip(t -> {
+            sortBtn.addListener(new Tooltip(t -> {
+                t.background(Styles.black6);
                 t.add(sortMode == 0 ? "Sort: Latest" : "Sort: Stars");
-            });
+            }));
             
             ImageButton filterBtn = headerContainer.button(Icon.filter, Styles.cleari, 35f, () -> {
                 showFilterMenu();
             }).size(45f).padRight(5f).get();
-            filterBtn.tooltip("Filter mods");
+            filterBtn.addListener(new Tooltip(t -> {
+                t.background(Styles.black6);
+                t.add("Filter mods");
+            }));
         }
         
         headerContainer.button(Icon.book, Styles.cleari, 35f, () -> {
@@ -700,14 +704,15 @@ public class TestMod extends Mod {
         }
     }
 
-    Image makeBadge(Table parent, Drawable icon, Color baseColor, String title, String desc) {
+    Image makeBadge(Table parent, arc.scene.style.Drawable icon, Color baseColor, String title, String desc) {
         Image img = parent.image(icon).size(badgeSize, badgeSize * 0.625f).padLeft(badgeSpacing).padRight(badgeSpacing).get();
         img.setColor(baseColor);
         
-        img.tooltip(t -> {
+        img.addListener(new Tooltip(t -> {
+            t.background(Styles.black6);
             t.add("[accent]" + title).row();
             t.add("[lightgray]" + desc).wrap().width(180f);
-        });
+        }));
         
         img.update(() -> {
             if(img.hasMouse()) {
@@ -762,10 +767,10 @@ public class TestMod extends Mod {
                 }
                 
                 if(mod.hasJava && !mod.hasScripts) {
-                    Drawable d = javaBadge != null ? javaBadge : Icon.book;
+                    arc.scene.style.Drawable d = javaBadge != null ? javaBadge : Icon.book;
                     makeBadge(badges, d, Color.valueOf("b07219"), "Java Mod", "Contains compiled Java code");
                 } else if(mod.hasScripts && !mod.hasJava) {
-                    Drawable d = jsBadge != null ? jsBadge : Icon.logic;
+                    arc.scene.style.Drawable d = jsBadge != null ? jsBadge : Icon.logic;
                     makeBadge(badges, d, Color.valueOf("f1e05a"), "JavaScript Mod", "Uses Mindustry JS scripting");
                 } else if(mod.hasJava && mod.hasScripts) {
                     makeBadge(badges, Icon.warning, Color.orange, "Mixed Runtime", "Uses both Java and JavaScript");
