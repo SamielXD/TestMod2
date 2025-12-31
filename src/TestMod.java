@@ -15,6 +15,7 @@ import mindustry.mod.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import arc.util.serialization.*;
+import arc.scene.style.TextureRegionDrawable;
 
 public class TestMod extends Mod {
     
