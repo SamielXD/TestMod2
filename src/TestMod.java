@@ -175,7 +175,7 @@ public class TestMod extends Mod {
                 header.button(Icon.list, Styles.cleari, 40f, () -> {
                     sortMode = (sortMode + 1) % 2;
                     applySorting();
-                }).size(50f).padRight(5f).tooltip(() -> sortMode == 0 ? "Sort: Latest" : "Sort: Stars");
+                }).size(50f).padRight(5f).tooltip("Toggle Sort");
             }
             
             header.button(Icon.refresh, Styles.cleari, 40f, this::reloadMods).size(50f).padRight(10f);
