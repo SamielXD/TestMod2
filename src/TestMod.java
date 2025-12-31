@@ -43,9 +43,9 @@ public class TestMod extends Mod {
     private Seq<ModInfo> allMods = new Seq<>();
     private Seq<ModInfo> filteredMods = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
-    private ObjectMap<String, TextureRegion> iconCache = new ObjectMap<>();
+    private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
     private int currentPage = 0;
-    private int modsPerPage = 8;
+    private int modsPerPage = 10;
     private String searchQuery = "";
     private BaseDialog mainDialog;
     private Table modListContainer;
@@ -56,6 +56,7 @@ public class TestMod extends Mod {
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
     private int currentTab = 0;
+    private int sortMode = 0;
 
     public TestMod() {
         Log.info("ModInfo+ Initializing");
@@ -94,11 +95,9 @@ public class TestMod extends Mod {
         return tokens.get(0).getToken();
     }
     
-    void markTokenRateLimited(int responseCode) {
-        if(responseCode == 403) {
-            tokens.get(currentTokenIndex).rateLimited = true;
-            currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
-        }
+    void markTokenRateLimited() {
+        tokens.get(currentTokenIndex).rateLimited = true;
+        currentTokenIndex = (currentTokenIndex + 1) % tokens.size;
     }
     
     void githubGet(String url, Cons<String> success, Runnable fail) {
@@ -107,7 +106,7 @@ public class TestMod extends Mod {
             .header("Authorization", "token " + getNextToken())
             .timeout(15000)
             .error(e -> {
-                markTokenRateLimited(403);
+                markTokenRateLimited();
                 Core.app.post(fail);
             })
             .submit(res -> {
@@ -121,6 +120,7 @@ public class TestMod extends Mod {
         Events.on(ClientLoadEvent.class, e -> {
             Core.app.post(() -> {
                 loadBadges();
+                loadModIcons();
                 replaceModsButton();
             });
         });
@@ -132,6 +132,18 @@ public class TestMod extends Mod {
         
         if(!javaBadge.found()) javaBadge = null;
         if(!jsBadge.found()) jsBadge = null;
+    }
+    
+    void loadModIcons() {
+        for(Mods.LoadedMod mod : Vars.mods.list()) {
+            if(mod.iconTexture != null) {
+                String key = mod.name.toLowerCase();
+                modIcons.put(key, new TextureRegion(mod.iconTexture));
+                if(mod.meta != null && mod.meta.name != null) {
+                    modIcons.put(mod.meta.name.toLowerCase(), new TextureRegion(mod.iconTexture));
+                }
+            }
+        }
     }
     
     void replaceModsButton() {
@@ -148,32 +160,25 @@ public class TestMod extends Mod {
             mainDialog.show();
             return;
         }
+        mainDialog = new BaseDialog("Mods");
+        mainDialog.addCloseButton();
         
-        mainDialog = new BaseDialog("") {
-            {
-                setFillParent(true);
-                cont.clear();
-                buttons.clear();
-            }
-        };
-        
-        Table bg = new Table();
-        bg.setFillParent(true);
-        bg.setBackground(Tex.clear);
-        bg.color.set(0, 0, 0, 0.7f);
-        mainDialog.cont.addChild(bg);
-        
-        Table main = new Table();
-        main.setBackground(Tex.pane);
-        main.color.set(0.15f, 0.15f, 0.15f, 0.95f);
+        Table main = new Table(Tex.pane);
         
         main.table(header -> {
-            header.setBackground(Tex.button);
+            header.background(Tex.button);
             header.image(Icon.book).size(40f).padLeft(15f).padRight(10f);
             header.add("[accent]MODINFO+").style(Styles.outlineLabel).left();
             header.add().growX();
+            
+            if(currentTab == 2) {
+                header.button(Icon.list, Styles.cleari, 40f, () -> {
+                    sortMode = (sortMode + 1) % 2;
+                    applySorting();
+                }).size(50f).padRight(5f).tooltip(() -> sortMode == 0 ? "Sort: Latest" : "Sort: Stars");
+            }
+            
             header.button(Icon.refresh, Styles.cleari, 40f, this::reloadMods).size(50f).padRight(10f);
-            header.button(Icon.cancel, Styles.cleari, 40f, mainDialog::hide).size(50f).padRight(10f);
         }).fillX().height(60f).row();
         
         main.image().color(accentColor).fillX().height(3f).row();
@@ -204,15 +209,16 @@ public class TestMod extends Mod {
         modListContainer = new Table();
         ScrollPane pane = new ScrollPane(modListContainer);
         pane.setFadeScrollBars(false);
-        main.add(pane).grow().row();
+        
+        float screenHeight = Core.graphics.getHeight();
+        float scrollHeight = screenHeight * 0.6f;
+        
+        main.add(pane).grow().height(scrollHeight).row();
         
         paginationBar = new Table();
         main.add(paginationBar).fillX().row();
         
-        float screenHeight = Core.graphics.getHeight();
-        float dialogHeight = Math.min(screenHeight * 0.95f, 1000f);
-        
-        mainDialog.cont.add(main).size(Math.min(900f, Core.graphics.getWidth() * 0.95f), dialogHeight);
+        mainDialog.cont.add(main).size(900f, screenHeight * 0.85f);
         mainDialog.show();
         
         switchTab(0);
@@ -220,6 +226,7 @@ public class TestMod extends Mod {
     currentTab = tab;
     currentPage = 0;
     searchQuery = "";
+    sortMode = 0;
     if(searchField != null) searchField.setText("");
     
     if(tab == 0) fetchEnabledMods();
@@ -234,13 +241,22 @@ void reloadMods() {
     switchTab(currentTab);
 }
 
+void applySorting() {
+    if(sortMode == 0) {
+        filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
+    } else {
+        filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
+    }
+    updateVisibleMods();
+}
+
 void buildPaginationBar() {
     if(paginationBar == null) return;
     paginationBar.clearChildren();
     
     if(currentTab != 2) return;
     
-    paginationBar.setBackground(Tex.button);
+    paginationBar.background(Tex.button);
     
     paginationBar.button("<", Styles.cleart, () -> {
         if(currentPage > 0) {
@@ -274,6 +290,7 @@ void applyFilter() {
             }
         }
     }
+    applySorting();
 }
 
 void updateVisibleMods() {
@@ -352,13 +369,11 @@ ModInfo createModInfo(Mods.LoadedMod mod) {
         info.author = mod.meta.author;
         info.description = mod.meta.description;
         info.version = mod.meta.version;
-        info.repo = mod.meta.repo != null ? mod.meta.repo : "";
     } else {
         info.name = mod.name;
         info.author = "Unknown";
         info.description = "";
         info.version = "1.0";
-        info.repo = "";
     }
     
     info.installedMod = mod;
@@ -371,7 +386,6 @@ ModInfo createModInfo(Mods.LoadedMod mod) {
 void detectCapabilities(ModInfo info, Mods.LoadedMod mod) {
     info.hasJava = mod.main != null;
     info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
-    info.hasContent = mod.root != null && mod.root.child("content").exists();
     info.serverCompatible = mod.meta != null && !mod.meta.hidden;
 }
 
@@ -382,27 +396,10 @@ void fetchRemoteMods() {
         "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
         json -> {
             allMods = parseModList(json);
-            
-            for(ModInfo mod : allMods) {
-                if(!mod.repo.isEmpty()) {
-                    lazyLoadIcon(mod);
-                }
-            }
-            
             applyFilter();
             updateVisibleMods();
         },
         () -> updateStatusLabel("[scarlet]Failed to load mod list")
-    );
-}
-
-void lazyLoadIcon(ModInfo mod) {
-    if(iconCache.containsKey(mod.repo)) return;
-    
-    githubGet(
-        "https://raw.githubusercontent.com/" + mod.repo + "/master/icon.png",
-        ignored -> {},
-        () -> {}
     );
 }
 
@@ -422,7 +419,6 @@ Seq<ModInfo> parseModList(String json) {
             
             mod.hasJava = modJson.getBoolean("hasJava", false);
             mod.hasScripts = modJson.getBoolean("hasScripts", false);
-            mod.hasContent = modJson.getBoolean("hasContent", false);
             mod.serverCompatible = !modJson.getBoolean("clientSide", true);
             
             for(Mods.LoadedMod installed : Vars.mods.list()) {
@@ -501,25 +497,16 @@ String formatDate(String dateStr) {
                 }
                 
                 title.add(badges);
-                
-                if(mod.stars >= 10) {
-                    title.add(" [yellow]\u2605" + mod.stars).padLeft(8f);
-                }
-                
-                if(mod.isInstalled) {
-                    title.image(Icon.ok).size(20f).color(Color.lime).padLeft(8f);
-                }
             }).row();
             
-            info.add("[lightgray]by " + mod.author + " [gray]| v" + mod.version).padTop(4f).row();
+            info.add("[lightgray]v" + mod.version).padTop(2f);
             
-            if(!mod.description.isEmpty()) {
-                String desc = mod.description.length() > 80 ? 
-                    mod.description.substring(0, 77) + "..." : mod.description;
-                Label descLabel = new Label(desc);
-                descLabel.setWrap(true);
-                descLabel.setColor(Color.lightGray);
-                info.add(descLabel).width(450f).padTop(4f).row();
+            if(mod.stars >= 10) {
+                info.add(" [yellow]\u2605" + mod.stars).padLeft(8f);
+            }
+            
+            if(mod.isInstalled) {
+                info.image(Icon.ok).size(18f).color(Color.lime).padLeft(8f);
             }
             
         }).growX().pad(10f);
@@ -556,7 +543,7 @@ String formatDate(String dateStr) {
             }
         }).right().padRight(10f);
         
-    }).fillX().height(110f).pad(4f).row();
+    }).fillX().height(80f).pad(4f).row();
 }
 
 TextureRegion getModIcon(ModInfo mod) {
@@ -564,8 +551,9 @@ TextureRegion getModIcon(ModInfo mod) {
         return new TextureRegion(mod.installedMod.iconTexture);
     }
     
-    if(iconCache.containsKey(mod.repo)) {
-        return iconCache.get(mod.repo);
+    String key = mod.name.toLowerCase();
+    if(modIcons.containsKey(key)) {
+        return modIcons.get(key);
     }
     
     return null;
@@ -653,7 +641,7 @@ void downloadModFile(ModInfo mod, String url) {
         Http.get(url)
             .timeout(30000)
             .error(e -> Core.app.post(() -> {
-                Vars.ui.showErrorMessage("Download failed: " + e.getMessage());
+                Vars.ui.showErrorMessage("Download failed");
                 updateStatusLabel("[scarlet]Download failed");
             }))
             .submit(res -> {
@@ -928,7 +916,6 @@ class ModInfo {
     int stars = 0;
     boolean hasJava = false;
     boolean hasScripts = false;
-    boolean hasContent = false;
     boolean serverCompatible = false;
     boolean isInstalled = false;
     Mods.LoadedMod installedMod = null;
