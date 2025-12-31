@@ -7,6 +7,7 @@ import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
+import arc.files.*;
 import mindustry.*;
 import mindustry.game.EventType.*;
 import mindustry.gen.*;
@@ -58,7 +59,7 @@ public class TestMod extends Mod {
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
     private ObjectMap<String, TextureRegion> modIcons = new ObjectMap<>();
-    private int currentTab = 0; // 0=Enabled, 1=Disabled, 2=Browse
+    private int currentTab = 0;
 
     public TestMod() {
         Log.info("ModInfo+ Initializing");
@@ -160,7 +161,9 @@ public class TestMod extends Mod {
                 showEnhancedBrowser();
             });
         });
-    }void showEnhancedBrowser() {
+    }
+    
+    void showEnhancedBrowser() {
         if(mainDialog != null) {
             mainDialog.show();
             return;
@@ -239,7 +242,7 @@ public class TestMod extends Mod {
         if(paginationBar == null) return;
         paginationBar.clearChildren();
         
-        if(currentTab != 2) return; // Only show for Browse tab
+        if(currentTab != 2) return;
         
         paginationBar.background(Tex.button);
         
@@ -282,7 +285,6 @@ public class TestMod extends Mod {
         modListContainer.clearChildren();
         
         if(currentTab < 2) {
-            // Enabled/Disabled tabs - show all
             if(filteredMods.isEmpty()) {
                 modListContainer.add("[lightgray]No mods found").pad(40f);
             } else {
@@ -291,7 +293,6 @@ public class TestMod extends Mod {
                 }
             }
         } else {
-            // Browse tab - paginated
             int start = currentPage * modsPerPage;
             int end = Math.min(start + modsPerPage, filteredMods.size);
             
@@ -443,13 +444,10 @@ public class TestMod extends Mod {
         } catch(Exception e) {
             return dateStr;
         }
-    }
-
-    void buildModRow(Table table, ModInfo mod) {
+    }void buildModRow(Table table, ModInfo mod) {
         table.table(Tex.button, row -> {
             row.left();
             
-            // Icon - only show for installed mods
             if(mod.isInstalled) {
                 TextureRegion icon = getModIcon(mod);
                 if(icon != null) {
@@ -464,7 +462,6 @@ public class TestMod extends Mod {
             row.table(info -> {
                 info.left().defaults().left();
                 
-                // Title row - ONLY name and version
                 info.table(title -> {
                     title.left();
                     title.add("[accent]" + mod.name + " [lightgray]v" + mod.version).style(Styles.outlineLabel);
@@ -488,7 +485,6 @@ public class TestMod extends Mod {
                 }).tooltip("Details");
                 
                 if(currentTab < 2) {
-                    // Enabled/Disabled tabs
                     if(mod.installedMod != null) {
                         btns.button(mod.installedMod.enabled() ? Icon.cancel : Icon.ok, Styles.clearNonei, () -> {
                             toggleMod(mod);
@@ -499,7 +495,6 @@ public class TestMod extends Mod {
                         }).tooltip("Delete");
                     }
                 } else {
-                    // Browse tab
                     if(!mod.repo.isEmpty()) {
                         btns.button(Icon.link, Styles.clearNonei, () -> {
                             Core.app.openURI("https://github.com/" + mod.repo);
@@ -552,7 +547,9 @@ public class TestMod extends Mod {
             Vars.ui.showInfo("Deleted " + mod.name);
             reloadMods();
         });
-    }void downloadMod(ModInfo mod) {
+    }
+
+    void downloadMod(ModInfo mod) {
         if(mod.repo.isEmpty()) {
             Vars.ui.showErrorMessage("No repository URL available");
             return;
@@ -560,7 +557,6 @@ public class TestMod extends Mod {
         
         updateStatusLabel("[cyan]Downloading " + mod.name + "...");
         
-        // Try to get the latest release
         githubGet(
             "https://api.github.com/repos/" + mod.repo + "/releases/latest",
             json -> {
@@ -570,7 +566,6 @@ public class TestMod extends Mod {
                     
                     String downloadUrl = null;
                     
-                    // Look for .jar or .zip files
                     if(assets != null && assets.size > 0) {
                         for(JsonValue asset : assets) {
                             String name = asset.getString("name", "");
@@ -588,7 +583,6 @@ public class TestMod extends Mod {
                             downloadModFile(mod, finalUrl);
                         });
                     } else {
-                        // No assets, try zipball
                         Core.app.post(() -> downloadFromZipball(mod));
                     }
                 } catch(Exception e) {
@@ -608,7 +602,7 @@ public class TestMod extends Mod {
     
     void downloadModFile(ModInfo mod, String url) {
         try {
-            Fi file = Vars.tmpDirectory.child(mod.name + "-temp.zip");
+            arc.files.Fi file = Vars.tmpDirectory.child(mod.name + "-temp.zip");
             
             Http.get(url)
                 .timeout(30000)
@@ -639,23 +633,21 @@ public class TestMod extends Mod {
         }
     }
     
-    void installDownloadedMod(ModInfo mod, Fi zipFile) {
+    void installDownloadedMod(ModInfo mod, arc.files.Fi zipFile) {
         try {
-            Fi modsDir = Vars.modDirectory;
-            Fi extractDir = modsDir.child(mod.name);
+            arc.files.Fi modsDir = Vars.modDirectory;
+            arc.files.Fi extractDir = modsDir.child(mod.name);
             
-            // Remove old version if exists
             if(extractDir.exists()) {
                 extractDir.deleteDirectory();
             }
             extractDir.mkdirs();
             
-            // Extract zip
-            ZipFi zip = new ZipFi(zipFile);
+            arc.files.ZipFi zip = new arc.files.ZipFi(zipFile);
             zip.walk(file -> {
                 if(file.name().equals(zipFile.name())) return;
                 
-                Fi output = extractDir.child(file.path().replace(zip.file.name() + "/", ""));
+                arc.files.Fi output = extractDir.child(file.path().replace(zip.file.name() + "/", ""));
                 if(file.isDirectory()) {
                     output.mkdirs();
                 } else {
@@ -665,9 +657,8 @@ public class TestMod extends Mod {
             
             zipFile.delete();
             
-            // Reload mods
-            Vars.mods.reloadContent();
-            Vars.ui.showInfo("[lime]Installed " + mod.name + "!\n[lightgray]Restart required.");
+            Vars.mods.load();
+            Vars.ui.showInfo("[lime]Installed " + mod.name + "!\n[lightgray]Restart recommended.");
             
             Core.app.post(() -> reloadMods());
             
@@ -685,7 +676,6 @@ public class TestMod extends Mod {
         Table content = new Table(Tex.pane);
         content.margin(15f);
         
-        // Icon
         TextureRegion icon = getModIcon(mod);
         if(icon != null) {
             content.image(icon).size(80f).pad(10f).row();
@@ -693,7 +683,6 @@ public class TestMod extends Mod {
             content.image(Icon.box).size(80f).color(Color.gray).pad(10f).row();
         }
         
-        // Name and badges
         Table titleRow = new Table();
         titleRow.add("[accent]" + mod.name).pad(5f);
         
@@ -738,14 +727,12 @@ public class TestMod extends Mod {
         titleRow.add(badges);
         content.add(titleRow).row();
         
-        // Author and version
         content.add("[cyan]by " + mod.author).pad(5f).row();
         content.add("[lightgray]v" + mod.version).pad(3f).row();
         if(mod.stars > 0) {
             content.add("[yellow]\u2605 " + mod.stars + " stars").pad(3f).row();
         }
         
-        // Description
         if(!mod.description.isEmpty()) {
             Label desc = new Label(mod.description);
             desc.setWrap(true);
@@ -756,7 +743,6 @@ public class TestMod extends Mod {
         
         content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
         
-        // Stats
         Table statsTable = new Table();
         if(!mod.repo.isEmpty()) {
             statsTable.add("[cyan]Loading stats...").pad(15f);
@@ -766,7 +752,6 @@ public class TestMod extends Mod {
         
         content.image().height(3f).width(400f).color(accentColor).pad(10f).row();
         
-        // Action buttons
         content.table(actions -> {
             if(!mod.repo.isEmpty()) {
                 actions.button("Open GitHub", Icon.link, () -> {
@@ -791,9 +776,7 @@ public class TestMod extends Mod {
         ScrollPane pane = new ScrollPane(content);
         dialog.cont.add(pane).grow();
         dialog.show();
-    }
-
-    void loadGitHubStats(ModInfo mod, Table statsTable) {
+    }void loadGitHubStats(ModInfo mod, Table statsTable) {
         String key = mod.repo;
         if(statsCache.containsKey(key)) {
             displayStats(statsTable, mod, statsCache.get(key));
@@ -882,7 +865,6 @@ public class TestMod extends Mod {
         });
     }
 
-    // Data classes
     class ModInfo {
         String repo = "";
         String name = "";
