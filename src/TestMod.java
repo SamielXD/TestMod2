@@ -106,18 +106,13 @@ public class TestMod extends Mod {
             .header("User-Agent", "Mindustry-ModBrowser")
             .header("Authorization", "token " + getNextToken())
             .timeout(15000)
-            .error(e -> Core.app.post(fail))
+            .error(e -> {
+                markTokenRateLimited(403);
+                Core.app.post(fail);
+            })
             .submit(res -> {
-                int code = res.getStatus().getStatusCode();
-                if(code == 403) {
-                    markTokenRateLimited(code);
-                    Core.app.post(fail);
-                } else if(code == 200) {
-                    String text = res.getResultAsString();
-                    Core.app.post(() -> success.get(text));
-                } else {
-                    Core.app.post(fail);
-                }
+                String text = res.getResultAsString();
+                Core.app.post(() -> success.get(text));
             });
     }
 
@@ -164,19 +159,13 @@ public class TestMod extends Mod {
         
         Table bg = new Table();
         bg.setFillParent(true);
-        bg.setBackground(new TextureRegionDrawable(Core.atlas.white()) {
-            {
-                tint(new Color(0, 0, 0, 0.7f));
-            }
-        });
+        bg.setBackground(Tex.clear);
+        bg.color.set(0, 0, 0, 0.7f);
         mainDialog.cont.addChild(bg);
         
         Table main = new Table();
-        main.setBackground(new TextureRegionDrawable(Core.atlas.white()) {
-            {
-                tint(new Color(0.15f, 0.15f, 0.15f, 0.95f));
-            }
-        });
+        main.setBackground(Tex.pane);
+        main.color.set(0.15f, 0.15f, 0.15f, 0.95f);
         
         main.table(header -> {
             header.setBackground(Tex.button);
