@@ -3,6 +3,7 @@ import arc.func.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.scene.*;
+import arc.scene.event.*;
 import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.scene.style.*;
@@ -17,9 +18,8 @@ import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import arc.util.serialization.*;
 
-public class TestMod extends Mod {
+public class ModInfoPlus extends Mod {
     
-    // ===== TOKEN MANAGEMENT =====
     private static class TokenInfo {
         String[] parts;
         int requestCount = 0;
@@ -42,14 +42,12 @@ public class TestMod extends Mod {
     private static final int MAX_REQUESTS_PER_TOKEN = 50;
     private static final long RATE_LIMIT_RESET_TIME = 3600000;
     
-    // ===== DATA STRUCTURES =====
     private Seq<ModInfo> remoteIndex = new Seq<>();
     private Seq<ModInfo> filteredMods = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> iconCache = new ObjectMap<>();
     private ObjectMap<String, Texture> remoteIconTextures = new ObjectMap<>();
     
-    // ===== UI STATE =====
     private int currentPage = 0;
     private int modsPerPage = 10;
     private String searchQuery = "";
@@ -64,7 +62,6 @@ public class TestMod extends Mod {
     private String filterMode = "all";
     private boolean needsRestart = false;
     
-    // ===== SETTINGS (ACTUAL WORKING ONES) =====
     private float badgeSize = 24f;
     private float badgeSpacing = 4f;
     private float iconSize = 64f;
@@ -76,38 +73,37 @@ public class TestMod extends Mod {
     private int verifiedStarThreshold = 50;
     private Color accentColor = Color.valueOf("ffd37f");
     
-    // ===== BADGE TEXTURES =====
     private TextureRegion javaBadge;
     private TextureRegion jsBadge;
 
-    public TestMod() {
-        Log.info("Helium Mod Browser Initializing");
+    public ModInfoPlus() {
+        Log.info("ModInfo+ Browser Initializing");
         initTokens();
         loadSettings();
     }
     
     void loadSettings() {
-        badgeSize = Core.settings.getFloat("helium-badgesize", 24f);
-        badgeSpacing = Core.settings.getFloat("helium-badgespacing", 4f);
-        iconSize = Core.settings.getFloat("helium-iconsize", 64f);
-        rowHeight = Core.settings.getFloat("helium-rowheight", 90f);
-        showBadgeGlow = Core.settings.getBool("helium-badgeglow", true);
-        showUpdateBadge = Core.settings.getBool("helium-updatebadge", true);
-        showLanguageBadges = Core.settings.getBool("helium-langbadges", true);
-        animateBadges = Core.settings.getBool("helium-animatebadges", true);
-        verifiedStarThreshold = Core.settings.getInt("helium-starverify", 50);
+        badgeSize = Core.settings.getFloat("modinfo-badgesize", 24f);
+        badgeSpacing = Core.settings.getFloat("modinfo-badgespacing", 4f);
+        iconSize = Core.settings.getFloat("modinfo-iconsize", 64f);
+        rowHeight = Core.settings.getFloat("modinfo-rowheight", 90f);
+        showBadgeGlow = Core.settings.getBool("modinfo-badgeglow", true);
+        showUpdateBadge = Core.settings.getBool("modinfo-updatebadge", true);
+        showLanguageBadges = Core.settings.getBool("modinfo-langbadges", true);
+        animateBadges = Core.settings.getBool("modinfo-animatebadges", true);
+        verifiedStarThreshold = Core.settings.getInt("modinfo-starverify", 50);
     }
     
     void saveSettings() {
-        Core.settings.put("helium-badgesize", badgeSize);
-        Core.settings.put("helium-badgespacing", badgeSpacing);
-        Core.settings.put("helium-iconsize", iconSize);
-        Core.settings.put("helium-rowheight", rowHeight);
-        Core.settings.put("helium-badgeglow", showBadgeGlow);
-        Core.settings.put("helium-updatebadge", showUpdateBadge);
-        Core.settings.put("helium-langbadges", showLanguageBadges);
-        Core.settings.put("helium-animatebadges", animateBadges);
-        Core.settings.put("helium-starverify", verifiedStarThreshold);
+        Core.settings.put("modinfo-badgesize", badgeSize);
+        Core.settings.put("modinfo-badgespacing", badgeSpacing);
+        Core.settings.put("modinfo-iconsize", iconSize);
+        Core.settings.put("modinfo-rowheight", rowHeight);
+        Core.settings.put("modinfo-badgeglow", showBadgeGlow);
+        Core.settings.put("modinfo-updatebadge", showUpdateBadge);
+        Core.settings.put("modinfo-langbadges", showLanguageBadges);
+        Core.settings.put("modinfo-animatebadges", animateBadges);
+        Core.settings.put("modinfo-starverify", verifiedStarThreshold);
         Core.settings.forceSave();
     }
     
@@ -175,14 +171,14 @@ public class TestMod extends Mod {
             Core.app.post(() -> {
                 loadBadgeTextures();
                 replaceModsButton();
-                addHeliumSettings();
+                addModInfoSettings();
             });
         });
     }
     
     void loadBadgeTextures() {
-        javaBadge = Core.atlas.find("testmod-java-badge");
-        jsBadge = Core.atlas.find("testmod-js-badge");
+        javaBadge = Core.atlas.find("modinfo-java-badge");
+        jsBadge = Core.atlas.find("modinfo-js-badge");
         
         if(!javaBadge.found()) javaBadge = null;
         if(!jsBadge.found()) jsBadge = null;
@@ -192,12 +188,12 @@ public class TestMod extends Mod {
         Vars.ui.mods.shown(() -> {
             Core.app.post(() -> {
                 Vars.ui.mods.hide();
-                showHeliumBrowser();
+                showModInfoBrowser();
             });
         });
-    }void addHeliumSettings() {
-        Vars.ui.settings.addCategory("Helium Browser", Icon.book, table -> {
-            table.add("[accent]Helium Mod Browser Settings").pad(10f).row();
+    }void addModInfoSettings() {
+        Vars.ui.settings.addCategory("ModInfo+ Browser", Icon.book, table -> {
+            table.add("[accent]ModInfo+ Browser Settings").pad(10f).row();
             table.image().height(3f).width(400f).color(accentColor).pad(5f).row();
             
             table.table(t -> {
@@ -205,6 +201,7 @@ public class TestMod extends Mod {
                 Slider slider = t.slider(12f, 48f, 2f, badgeSize, v -> {
                     badgeSize = v;
                     saveSettings();
+                    rebuildIfOpen();
                 }).width(200f).get();
                 Label label = new Label("");
                 label.update(() -> label.setText(String.format("%.0fpx", badgeSize)));
@@ -216,6 +213,7 @@ public class TestMod extends Mod {
                 Slider slider = t.slider(0f, 16f, 1f, badgeSpacing, v -> {
                     badgeSpacing = v;
                     saveSettings();
+                    rebuildIfOpen();
                 }).width(200f).get();
                 Label label = new Label("");
                 label.update(() -> label.setText(String.format("%.0fpx", badgeSpacing)));
@@ -228,6 +226,7 @@ public class TestMod extends Mod {
                     iconSize = v;
                     rowHeight = iconSize + 26f;
                     saveSettings();
+                    rebuildIfOpen();
                 }).width(200f).get();
                 Label label = new Label("");
                 label.update(() -> label.setText(String.format("%.0fpx", iconSize)));
@@ -239,6 +238,7 @@ public class TestMod extends Mod {
                 Slider slider = t.slider(5f, 30f, 1f, modsPerPage, v -> {
                     modsPerPage = (int)v;
                     saveSettings();
+                    rebuildIfOpen();
                 }).width(200f).get();
                 Label label = new Label("");
                 label.update(() -> label.setText(String.valueOf(modsPerPage)));
@@ -266,11 +266,13 @@ public class TestMod extends Mod {
             table.check("Show Update Badges", showUpdateBadge, v -> {
                 showUpdateBadge = v;
                 saveSettings();
+                rebuildIfOpen();
             }).left().pad(5f).row();
             
             table.check("Show Language Badges", showLanguageBadges, v -> {
                 showLanguageBadges = v;
                 saveSettings();
+                rebuildIfOpen();
             }).left().pad(5f).row();
             
             table.check("Animate Badges", animateBadges, v -> {
@@ -292,19 +294,26 @@ public class TestMod extends Mod {
                 animateBadges = true;
                 verifiedStarThreshold = 50;
                 saveSettings();
+                rebuildIfOpen();
                 Vars.ui.showInfo("[lime]Settings reset to defaults");
             }).size(250f, 50f).pad(10f);
             
-            table.add("[lightgray]Helium Browser v2.0").pad(10f);
+            table.add("[lightgray]ModInfo+ v1.0").pad(10f);
         });
     }
     
-    void showHeliumBrowser() {
+    void rebuildIfOpen() {
+        if(mainDialog != null && mainDialog.isShown()) {
+            updateVisibleMods();
+        }
+    }
+    
+    void showModInfoBrowser() {
         if(mainDialog != null) {
             mainDialog.show();
             return;
         }
-        mainDialog = new BaseDialog("Helium Mod Browser");
+        mainDialog = new BaseDialog("ModInfo+ Browser");
         mainDialog.addCloseButton();
         mainDialog.hidden(() -> {
             if(needsRestart) {
@@ -419,7 +428,7 @@ public class TestMod extends Mod {
         headerContainer.background(Tex.button);
         
         headerContainer.image(Icon.book).size(35f).padLeft(10f).padRight(8f);
-        headerContainer.add("[accent]HELIUM").style(Styles.outlineLabel).left();
+        headerContainer.add("[accent]MODINFO+").style(Styles.outlineLabel).left();
         headerContainer.add().growX();
         
         if(currentTab == 2) {
@@ -822,11 +831,13 @@ public class TestMod extends Mod {
             
             Table badgeOverlay = new Table();
             badgeOverlay.top().left();
+            badgeOverlay.touchable = Touchable.childrenOnly;
             renderBadges(badgeOverlay, mod);
             
             Stack stack = new Stack();
             stack.add(iconStack);
             stack.add(badgeOverlay);
+            stack.touchable = Touchable.childrenOnly;
             row.add(stack).size(iconSize + 16f).pad(4f);
             
             row.table(info -> {
@@ -871,6 +882,10 @@ public class TestMod extends Mod {
         Table topRight = new Table();
         Table bottomRight = new Table();
         
+        topLeft.left();
+        topRight.right();
+        bottomRight.right();
+        
         if(showLanguageBadges) {
             if(mod.hasJava && !mod.hasScripts) {
                 addBadge(topLeft, javaBadge != null ? new TextureRegionDrawable(javaBadge) : Icon.book, 
@@ -905,19 +920,26 @@ public class TestMod extends Mod {
     }
 
     void addBadge(Table parent, Drawable icon, Color baseColor, String title, String desc) {
-        Image img = parent.image(icon).size(badgeSize).padRight(badgeSpacing / 2f).get();
-        img.setColor(baseColor);
+        Table badgeWrap = new Table();
+        badgeWrap.touchable = Touchable.enabled;
         
-        img.addListener(new Tooltip(t -> {
+        Image img = new Image(icon);
+        img.setColor(baseColor);
+        badgeWrap.add(img).size(badgeSize);
+        
+        parent.add(badgeWrap).size(badgeSize).padRight(badgeSpacing / 2f);
+        
+        badgeWrap.addListener(new Tooltip(t -> {
             t.background(Styles.black6);
-            t.add("[accent]" + title + "\n[lightgray]" + desc);
+            t.add("[accent]" + title + "\n[lightgray]" + desc).pad(6f);
         }));
         
-        if(animateBadges) {
-            img.update(() -> {
-                if(showBadgeGlow && img.hasMouse()) {
+        if(animateBadges && showBadgeGlow) {
+            badgeWrap.addListener(new InputListener() {
+                public void enter(InputEvent event, float x, float y, int pointer, Element fromActor) {
                     img.setColor(baseColor.cpy().lerp(Color.white, 0.4f));
-                } else {
+                }
+                public void exit(InputEvent event, float x, float y, int pointer, Element toActor) {
                     img.setColor(baseColor);
                 }
             });
