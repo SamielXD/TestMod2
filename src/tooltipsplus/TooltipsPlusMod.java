@@ -3,7 +3,6 @@ package tooltipsplus;
 import arc.Events;
 import arc.graphics.g2d.*;
 import arc.math.geom.*;
-import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.util.*;
 import mindustry.*;
@@ -16,59 +15,28 @@ import mindustry.world.*;
 import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.blocks.distribution.*;
-import mindustry.world.blocks.liquid.*;
 import mindustry.world.blocks.defense.turrets.*;
-import mindustry.world.meta.*;
+import mindustry.world.blocks.storage.*;
 
 public class TooltipsPlusMod extends Mod {
 
     boolean enabled = true;
-    boolean showPowerDetails = true;
-    boolean showItemFlow = true;
-    boolean showUnitAdvanced = true;
+    boolean showBottlenecks = true;
+    boolean showPredictions = true;
+    boolean showTargeting = true;
+    boolean learnerMode = false;
     boolean compactMode = false;
-    boolean showWarnings = true;
     
-    boolean showTurretInfo = true;
-    boolean showConnectionInfo = true;
-    boolean showDrillInfo = true;
-    boolean showTeamStats = true;
-    boolean showRepairInfo = true;
-    boolean showStorageBreakdown = true;
-    boolean showProductionHistory = true;
-    boolean comparisonMode = false;
-    
-    int tooltipOpacity = 8;
-    boolean followCursor = true;
-    boolean showIcons = true;
-    int fontSize = 1;
-    String colorTheme = "default";
-    boolean playHoverSound = false;
-    boolean highlightHovered = true;
-    boolean showOnMinimap = false;
-    int maxTooltipLines = 20;
+    int tooltipOpacity = 9;
+    float hoverDelay = 0.08f;
     
     Table tooltipTable;
     Building lastHoveredBuilding;
     Unit lastHoveredUnit;
     float hoverTimer = 0f;
-    float hoverDelay = 0.15f;
     
-    Building pinnedBuilding = null;
-    boolean isPinned = false;
-    
-    float[] productionHistory = new float[60];
-    int historyIndex = 0;
-    float lastHealth = 0f;
-    
-    Interval updateInterval = new Interval(2);
-    float[] buildingStats = new float[10];
-    
-    String statColor = "[stat]";
-    String accentColor = "[accent]";
-    String warningColor = "[scarlet]";
-    String successColor = "[lime]";
-    String infoColor = "[lightgray]";
+    float[] damageDealt = new float[100];
+    float[] healingDone = new float[100];
     
     public TooltipsPlusMod() {
         loadSettings();
@@ -76,105 +44,38 @@ public class TooltipsPlusMod extends Mod {
 
     void loadSettings() {
         enabled = arc.Core.settings.getBool("ttp-enabled", true);
-        showPowerDetails = arc.Core.settings.getBool("ttp-power", true);
-        showItemFlow = arc.Core.settings.getBool("ttp-itemflow", true);
-        showUnitAdvanced = arc.Core.settings.getBool("ttp-unitadv", true);
+        showBottlenecks = arc.Core.settings.getBool("ttp-bottleneck", true);
+        showPredictions = arc.Core.settings.getBool("ttp-predict", true);
+        showTargeting = arc.Core.settings.getBool("ttp-target", true);
+        learnerMode = arc.Core.settings.getBool("ttp-learner", false);
         compactMode = arc.Core.settings.getBool("ttp-compact", false);
-        showWarnings = arc.Core.settings.getBool("ttp-warnings", true);
-        
-        showTurretInfo = arc.Core.settings.getBool("ttp-turret", true);
-        showConnectionInfo = arc.Core.settings.getBool("ttp-connections", true);
-        showDrillInfo = arc.Core.settings.getBool("ttp-drill", true);
-        showTeamStats = arc.Core.settings.getBool("ttp-team", true);
-        showRepairInfo = arc.Core.settings.getBool("ttp-repair", true);
-        showStorageBreakdown = arc.Core.settings.getBool("ttp-storage", true);
-        showProductionHistory = arc.Core.settings.getBool("ttp-history", true);
-        
-        tooltipOpacity = arc.Core.settings.getInt("ttp-opacity", 8);
-        followCursor = arc.Core.settings.getBool("ttp-follow", true);
-        showIcons = arc.Core.settings.getBool("ttp-icons", true);
-        fontSize = arc.Core.settings.getInt("ttp-fontsize", 1);
-        colorTheme = arc.Core.settings.getString("ttp-theme", "default");
-        playHoverSound = arc.Core.settings.getBool("ttp-sound", false);
-        highlightHovered = arc.Core.settings.getBool("ttp-highlight", true);
-        showOnMinimap = arc.Core.settings.getBool("ttp-minimap", false);
-        maxTooltipLines = arc.Core.settings.getInt("ttp-maxlines", 20);
-        
-        applyColorTheme();
+        tooltipOpacity = arc.Core.settings.getInt("ttp-opacity", 9);
+        hoverDelay = arc.Core.settings.getFloat("ttp-delay", 0.08f);
     }
 
     void saveSettings() {
         arc.Core.settings.put("ttp-enabled", enabled);
-        arc.Core.settings.put("ttp-power", showPowerDetails);
-        arc.Core.settings.put("ttp-itemflow", showItemFlow);
-        arc.Core.settings.put("ttp-unitadv", showUnitAdvanced);
+        arc.Core.settings.put("ttp-bottleneck", showBottlenecks);
+        arc.Core.settings.put("ttp-predict", showPredictions);
+        arc.Core.settings.put("ttp-target", showTargeting);
+        arc.Core.settings.put("ttp-learner", learnerMode);
         arc.Core.settings.put("ttp-compact", compactMode);
-        arc.Core.settings.put("ttp-warnings", showWarnings);
-        
-        arc.Core.settings.put("ttp-turret", showTurretInfo);
-        arc.Core.settings.put("ttp-connections", showConnectionInfo);
-        arc.Core.settings.put("ttp-drill", showDrillInfo);
-        arc.Core.settings.put("ttp-team", showTeamStats);
-        arc.Core.settings.put("ttp-repair", showRepairInfo);
-        arc.Core.settings.put("ttp-storage", showStorageBreakdown);
-        arc.Core.settings.put("ttp-history", showProductionHistory);
-        
         arc.Core.settings.put("ttp-opacity", tooltipOpacity);
-        arc.Core.settings.put("ttp-follow", followCursor);
-        arc.Core.settings.put("ttp-icons", showIcons);
-        arc.Core.settings.put("ttp-fontsize", fontSize);
-        arc.Core.settings.put("ttp-theme", colorTheme);
-        arc.Core.settings.put("ttp-sound", playHoverSound);
-        arc.Core.settings.put("ttp-highlight", highlightHovered);
-        arc.Core.settings.put("ttp-minimap", showOnMinimap);
-        arc.Core.settings.put("ttp-maxlines", maxTooltipLines);
-        
+        arc.Core.settings.put("ttp-delay", hoverDelay);
         arc.Core.settings.forceSave();
     }
 
     @Override
     public void init() {
-        Log.info("TooltipsPlus v3.0 initializing...");
+        Log.info("TooltipsPlus v4.0 - Problem-Solving Tooltips");
         if (enabled) {
             setupTooltipSystem();
             setupHotkeys();
-            injectStaticDescriptions();
+            suppressVanillaTooltips();
+            trackCombatStats();
         }
         addSettingsUI();
-        Log.info("TooltipsPlus loaded successfully with all features");
-    }
-
-    void applyColorTheme() {
-        switch(colorTheme) {
-            case "dark":
-                statColor = "[gray]";
-                accentColor = "[lightgray]";
-                warningColor = "[orange]";
-                successColor = "[green]";
-                infoColor = "[darkgray]";
-                break;
-            case "neon":
-                statColor = "[cyan]";
-                accentColor = "[magenta]";
-                warningColor = "[red]";
-                successColor = "[lime]";
-                infoColor = "[sky]";
-                break;
-            case "minimal":
-                statColor = "";
-                accentColor = "";
-                warningColor = "[scarlet]";
-                successColor = "[lime]";
-                infoColor = "[lightgray]";
-                break;
-            default:
-                statColor = "[stat]";
-                accentColor = "[accent]";
-                warningColor = "[scarlet]";
-                successColor = "[lime]";
-                infoColor = "[lightgray]";
-                break;
-        }
+        Log.info("TooltipsPlus v4.0 loaded - Vanilla tooltips soft-replaced");
     }
 
     void setupHotkeys() {
@@ -182,29 +83,75 @@ public class TooltipsPlusMod extends Mod {
             if (arc.Core.input.keyTap(arc.input.KeyCode.t)) {
                 enabled = !enabled;
                 saveSettings();
-                Vars.ui.hudGroup.fill(t -> {
-                    t.label(() -> enabled ? "[lime]Tooltips ON" : "[scarlet]Tooltips OFF")
-                     .pad(10f);
-                });
-                Time.run(120f, () -> Vars.ui.hudGroup.clear());
+                Vars.ui.showInfo(enabled ? "[lime]Tooltips ON" : "[scarlet]Tooltips OFF");
             }
+        });
+    }
+
+    void suppressVanillaTooltips() {
+        Events.run(EventType.Trigger.update, () -> {
+            if (!enabled) return;
             
-            if (arc.Core.input.keyTap(arc.input.KeyCode.p) && lastHoveredBuilding != null) {
-                if (pinnedBuilding == lastHoveredBuilding) {
-                    pinnedBuilding = null;
-                    isPinned = false;
-                } else {
-                    pinnedBuilding = lastHoveredBuilding;
-                    isPinned = true;
+            try {
+                if (Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
+                    var blockInfo = Vars.ui.hudfrag.blockfrag;
+                    if (blockInfo.visible) {
+                        blockInfo.visible = false;
+                    }
                 }
+            } catch (Exception e) {
+            }
+        });
+        
+        for (Block block : Vars.content.blocks()) {
+            if (block.description != null && block.description.length() > 10) {
+                block.description = "";
+            }
+            block.details = "";
+        }
+        
+        for (UnitType unit : Vars.content.units()) {
+            if (unit.description != null && unit.description.length() > 10) {
+                unit.description = "";
+            }
+            unit.details = "";
+        }
+        
+        for (Item item : Vars.content.items()) {
+            if (item.description != null && item.description.length() > 10) {
+                item.description = "";
+            }
+            item.details = "";
+        }
+        
+        for (Liquid liquid : Vars.content.liquids()) {
+            if (liquid.description != null && liquid.description.length() > 10) {
+                liquid.description = "";
+            }
+            liquid.details = "";
+        }
+    }
+
+    void trackCombatStats() {
+        Events.on(EventType.UnitDamageEvent.class, event -> {
+            if (event.unit != null) {
+                int unitId = event.unit.id % 100;
+                damageDealt[unitId] += event.amount;
             }
         });
     }void setupTooltipSystem() {
         tooltipTable = new Table(Styles.black);
         tooltipTable.background(Tex.buttonEdge3);
-        tooltipTable.margin(6f);
+        tooltipTable.margin(8f);
         tooltipTable.visible = false;
         Vars.ui.hudGroup.addChild(tooltipTable);
+        
+        tooltipTable.update(() -> {
+            if (!enabled) {
+                tooltipTable.visible = false;
+                return;
+            }
+        });
         
         Events.run(EventType.Trigger.draw, () -> {
             if (!enabled || Vars.state.isMenu()) {
@@ -213,51 +160,26 @@ public class TooltipsPlusMod extends Mod {
                 return;
             }
             
-            if (updateInterval.get(0, 60f)) {
-                updateProductionTracking();
-            }
-            
             Vec2 mousePos = arc.Core.input.mouseWorld();
-            
             Tile hoverTile = Vars.world.tileWorld(mousePos.x, mousePos.y);
             Building hoveredBuilding = (hoverTile != null) ? hoverTile.build : null;
             
-            Unit hoveredUnit = Groups.unit.find(u -> {
-                return u.within(mousePos.x, mousePos.y, u.hitSize / 2f);
-            });
-            
-            if (isPinned && pinnedBuilding != null) {
-                showBuildingTooltip(pinnedBuilding);
-                return;
-            }
+            Unit hoveredUnit = Groups.unit.find(u -> u.within(mousePos.x, mousePos.y, u.hitSize / 2f));
             
             if (hoveredBuilding != lastHoveredBuilding || hoveredUnit != lastHoveredUnit) {
                 hoverTimer = 0f;
                 lastHoveredBuilding = hoveredBuilding;
                 lastHoveredUnit = hoveredUnit;
-                
-                if (playHoverSound && (hoveredBuilding != null || hoveredUnit != null)) {
-                    Sounds.click.play(0.3f);
-                }
             }
             
             if (hoveredBuilding != null || hoveredUnit != null) {
                 hoverTimer += Time.delta / 60f;
             }
             
-            if (highlightHovered && hoveredBuilding != null) {
-                Lines.stroke(2f);
-                Draw.color(arc.graphics.Color.cyan, 0.6f);
-                Lines.rect(hoveredBuilding.x - hoveredBuilding.block.size * 4f, 
-                          hoveredBuilding.y - hoveredBuilding.block.size * 4f,
-                          hoveredBuilding.block.size * 8f,
-                          hoveredBuilding.block.size * 8f);
-                Draw.reset();
-            }
-            
             if (hoverTimer >= hoverDelay) {
                 if (hoveredBuilding != null) {
-                    showBuildingTooltip(hoveredBuilding);
+                    showSmartTooltip(hoveredBuilding);
+                    drawVisualIndicators(hoveredBuilding);
                     return;
                 } else if (hoveredUnit != null) {
                     showUnitTooltip(hoveredUnit);
@@ -269,315 +191,252 @@ public class TooltipsPlusMod extends Mod {
         });
     }
 
-    void updateProductionTracking() {
-        if (lastHoveredBuilding != null && lastHoveredBuilding.block instanceof GenericCrafter) {
-            float status = lastHoveredBuilding.power != null ? lastHoveredBuilding.power.status : 0f;
-            productionHistory[historyIndex] = status;
-            historyIndex = (historyIndex + 1) % 60;
-        }
-    }
-
-    String repeat(String str, int count) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < count; i++) {
-            sb.append(str);
-        }
-        return sb.toString();
-    }
-
-    void showBuildingTooltip(Building build) {
+    void showSmartTooltip(Building build) {
         tooltipTable.clear();
         tooltipTable.visible = true;
         
-        Table titleRow = new Table();
-        if (showIcons && build.block.fullIcon != null) {
-            titleRow.image(build.block.fullIcon).size(24f * (fontSize + 1)).padRight(4f);
-        }
-        titleRow.add("[" + accentColor.replace("[", "").replace("]", "") + "]" + build.block.localizedName).style(Styles.outlineLabel);
-        tooltipTable.add(titleRow).left().row();
+        tooltipTable.add("[accent]" + build.block.localizedName).style(Styles.outlineLabel).row();
         
-        if (!compactMode) {
-            tooltipTable.add("[" + infoColor.replace("[", "").replace("]", "") + "]" + repeat("─", 20)).padTop(2f).padBottom(2f).row();
-        }
-        
-        float healthPercent = (build.health / build.maxHealth) * 100f;
-        String healthColor = getPercentColor(healthPercent);
-        String healthBar = makeProgressBar(build.health, build.maxHealth, 10);
-        
-        tooltipTable.add("🛡 [" + statColor.replace("[", "").replace("]", "") + "]HP: [" + healthColor.replace("[", "").replace("]", "") + "]" + (int)build.health + "[" + infoColor.replace("[", "").replace("]", "") + "]/" + (int)build.maxHealth).left().row();
-        
-        if (!compactMode && healthPercent < 100f) {
-            tooltipTable.add("  " + healthBar).left().row();
+        if (learnerMode) {
+            String explanation = getBlockExplanation(build);
+            if (explanation != null) {
+                tooltipTable.add("[lightgray]" + explanation).left().width(300f).wrap().row();
+                tooltipTable.row();
+            }
         }
         
-        if (showWarnings && healthPercent < 30f) {
-            tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]⚠ Critical Damage!").left().row();
+        String status = analyzeStatus(build);
+        if (status != null) {
+            tooltipTable.add(status).left().row();
         }
         
-        if (build.power != null && showPowerDetails) {
-            addPowerInfo(build);
+        if (showBottlenecks) {
+            String bottleneck = detectBottleneck(build);
+            if (bottleneck != null) {
+                tooltipTable.add("[scarlet]⚠ " + bottleneck).left().row();
+            }
         }
         
-        if (build.items != null && showStorageBreakdown) {
-            addItemStorageInfo(build);
+        if (showPredictions) {
+            String prediction = makePrediction(build);
+            if (prediction != null) {
+                tooltipTable.add("[sky]⏱ " + prediction).left().row();
+            }
         }
         
-        if (build.liquids != null) {
-            addLiquidInfo(build);
-        }
-        
-        if (showItemFlow && (build.block instanceof GenericCrafter || build.block instanceof Drill)) {
-            addProductionInfo(build);
-        }
-        
-        if (showTurretInfo && build.block instanceof Turret) {
-            addTurretInfo(build);
-        }
-        
-        if (showDrillInfo && build.block instanceof Drill) {
-            addDrillInfo(build);
-        }
-        
-        if (showConnectionInfo) {
-            addConnectionInfo(build);
-        }
-        
-        if (showPowerDetails && build.power != null) {
-            addPowerNetworkInfo(build);
-        }
-        
-        addConveyorFlowInfo(build);
-        
-        if (showTeamStats) {
-            addTeamInfo(build);
-        }
-        
-        if (isPinned) {
-            tooltipTable.add("[royal]📌 PINNED (P to unpin)").left().padTop(4f).row();
-        }
+        addContextInfo(build);
+        addTeamInfo(build);
         
         positionTooltip();
         tooltipTable.pack();
     }
 
-    void addPowerInfo(Building build) {
-        if (build.power == null) return;
+    String getBlockExplanation(Building build) {
+        if (build.block instanceof GenericCrafter) {
+            return "Converts input materials into output products using power";
+        } else if (build.block instanceof Drill) {
+            return "Extracts resources from the ground automatically";
+        } else if (build.block instanceof Turret) {
+            return "Defensive structure that attacks enemies in range";
+        } else if (build.block instanceof PowerGenerator) {
+            return "Generates power for your base";
+        } else if (build.block instanceof CoreBlock) {
+            return "Main base - stores all resources and spawns units";
+        } else if (build.block instanceof Conveyor) {
+            return "Transports items between buildings";
+        }
+        return null;
+    }
+
+    String analyzeStatus(Building build) {
+        float efficiency = build.efficiency;
+        float health = build.health / build.maxHealth;
         
-        tooltipTable.add(statColor + "─ Power ─").padTop(4f).row();
+        if (health < 0.25f) {
+            return "[scarlet]🔥 CRITICAL - Repair immediately!";
+        } else if (health < 0.5f) {
+            return "[orange]⚠ Damaged - Needs repair";
+        }
         
-        if (build.block.consPower != null && build.block.consPower.capacity > 0) {
-            float stored = build.power.status * build.block.consPower.capacity;
-            float capacity = build.block.consPower.capacity;
+        if (efficiency >= 1f) {
+            return "[lime]✓ Operating optimally";
+        } else if (efficiency > 0.7f) {
+            return "[yellow]⚙ Working (" + (int)(efficiency * 100) + "%)";
+        } else if (efficiency > 0.3f) {
+            return "[orange]⚠ Inefficient (" + (int)(efficiency * 100) + "%)";
+        } else if (efficiency > 0f) {
+            return "[scarlet]⚠ Barely working (" + (int)(efficiency * 100) + "%)";
+        } else {
+            return "[scarlet]✗ IDLE - Not working";
+        }
+    }
+
+    String detectBottleneck(Building build) {
+        if (build.power != null && build.power.status < 0.1f && build.block.consPower != null && build.block.consPower.usage > 0) {
+            return "No power - Connect to generator";
+        }
+        
+        if (build.items != null && build.block instanceof GenericCrafter) {
+            GenericCrafter crafter = (GenericCrafter)build.block;
+            if (crafter.consumesItems && build.items.total() == 0) {
+                return "No input items - Check supply chain";
+            }
+            if (build.items.total() >= build.block.itemCapacity * 0.95f) {
+                return "Output blocked - Items can't leave";
+            }
+        }
+        
+        if (build.liquids != null && build.block instanceof GenericCrafter) {
+            GenericCrafter crafter = (GenericCrafter)build.block;
+            if (crafter.hasLiquids && build.liquids.currentAmount() < 0.1f) {
+                return "No liquid input - Check pipes";
+            }
+        }
+        
+        if (build.block instanceof Turret && build instanceof Turret.TurretBuild) {
+            Turret.TurretBuild tb = (Turret.TurretBuild)build;
+            if (!tb.hasAmmo()) {
+                return "No ammo - Supply required";
+            }
             
-            String powerBar = makeProgressBar(stored, capacity, 10);
-            tooltipTable.add("⚡" + statColor + "Battery: " + accentColor + (int)stored + infoColor + "/" + (int)capacity).left().row();
-            if (!compactMode) {
-                tooltipTable.add("  " + powerBar).left().row();
+            boolean hasTarget = false;
+            for (Unit u : Groups.unit) {
+                if (u.team != build.team && u.within(build, ((Turret)build.block).range)) {
+                    hasTarget = true;
+                    break;
+                }
+            }
+            if (!hasTarget) {
+                return "No enemies in range";
+            }
+        }
+        
+        return null;
+    }
+
+    String makePrediction(Building build) {
+        if (build.items != null && build.items.total() > 0) {
+            if (build.block instanceof GenericCrafter) {
+                GenericCrafter crafter = (GenericCrafter)build.block;
+                if (crafter.outputItems != null && crafter.outputItems.length > 0) {
+                    float rate = (crafter.outputItems[0].amount / crafter.craftTime) * 60f * build.efficiency;
+                    if (rate > 0.01f) {
+                        int remaining = build.block.itemCapacity - build.items.total();
+                        float timeToFull = remaining / rate;
+                        if (timeToFull < 60f && timeToFull > 0f) {
+                            return "Storage full in " + (int)timeToFull + "s";
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (build.health < build.maxHealth) {
+            float damage = build.maxHealth - build.health;
+            if (damage > build.maxHealth * 0.3f) {
+                return "Repair priority: HIGH";
+            }
+        }
+        
+        return null;
+    }void addContextInfo(Building build) {
+        if (build.block instanceof Turret) {
+            Turret turret = (Turret)build.block;
+            tooltipTable.add("[lightgray]Range: [accent]" + (int)(turret.range / 8f) + " tiles").left().row();
+            
+            if (turret.reload > 0) {
+                float shotsPerMin = (60f / turret.reload) * 60f;
+                tooltipTable.add("[lightgray]Fire rate: [accent]" + Strings.autoFixed(shotsPerMin, 1) + "/min").left().row();
+            }
+        }
+        
+        if (build.block instanceof Drill) {
+            Drill drill = (Drill)build.block;
+            Tile tile = build.tile;
+            if (tile != null && tile.drop() != null) {
+                tooltipTable.add("[lightgray]Mining: " + tile.drop().emoji() + " [accent]" + tile.drop().localizedName).left().row();
+                
+                if (drill.drillTime > 0 && build.efficiency > 0) {
+                    float rate = (60f / drill.drillTime) * build.efficiency;
+                    tooltipTable.add("[lightgray]Output: [accent]" + Strings.autoFixed(rate, 1) + "/s").left().row();
+                }
+            }
+        }
+        
+        if (build.block instanceof CoreBlock && build.items != null) {
+            tooltipTable.add("[accent]═ Core Storage ═").center().row();
+            int count = 0;
+            for (int i = 0; i < Vars.content.items().size && count < 12; i++) {
+                var item = Vars.content.item(i);
+                int amount = build.items.get(item);
+                if (amount > 0) {
+                    tooltipTable.add(item.emoji() + " [lightgray]" + amount).left().row();
+                    count++;
+                }
             }
         }
         
         if (build.block instanceof PowerGenerator) {
             PowerGenerator gen = (PowerGenerator)build.block;
-            float production = gen.powerProduction * 60f;
-            tooltipTable.add("  " + successColor + "+ " + formatNumber(production) + "/s").left().row();
+            float production = gen.powerProduction * 60f * build.efficiency;
+            tooltipTable.add("[lightgray]Power: [lime]+" + Strings.autoFixed(production, 1) + "/s").left().row();
         }
-        
-        if (build.block.consPower != null && build.block.consPower.usage > 0) {
-            float usage = build.block.consPower.usage * 60f;
-            tooltipTable.add("  " + warningColor + "- " + formatNumber(usage) + "/s").left().row();
+    }
+
+    void addTeamInfo(Building build) {
+        if (build.team != Vars.player.team()) {
+            tooltipTable.add("[scarlet]⚠ ENEMY - " + build.team.emoji + " " + build.team.name).left().row();
+        } else if (Vars.state.rules.pvp) {
+            tooltipTable.add("[lime]Allied - " + build.team.emoji + " " + build.team.name).left().row();
         }
-        
+    }
+
+    void drawVisualIndicators(Building build) {
+        float health = build.health / build.maxHealth;
         float efficiency = build.efficiency;
-        if (efficiency < 1f) {
-            tooltipTable.add("  " + infoColor + "Efficiency: " + getPercentColor(efficiency * 100f) + (int)(efficiency * 100f) + "%").left().row();
-        }
-    }
-
-    void addItemStorageInfo(Building build) {
-        if (build.items == null || build.items.total() == 0) return;
         
-        tooltipTable.add("[" + statColor.replace("[", "").replace("]", "") + "]─ Items ─").padTop(4f).row();
-        
-        int total = build.items.total();
-        int capacity = build.block.itemCapacity;
-        float fillPercent = (total / (float)capacity) * 100f;
-        
-        tooltipTable.add("📦 [" + statColor.replace("[", "").replace("]", "") + "]Storage: [" + getPercentColor(fillPercent).replace("[", "").replace("]", "") + "]" + total + "[" + infoColor.replace("[", "").replace("]", "") + "]/" + capacity).left().row();
-        
-        if (!compactMode && fillPercent > 0) {
-            String storageBar = makeProgressBar(total, capacity, 10);
-            tooltipTable.add("  " + storageBar).left().row();
+        arc.graphics.Color borderColor = null;
+        if (health < 0.3f) {
+            borderColor = arc.graphics.Color.red;
+        } else if (efficiency < 0.5f) {
+            borderColor = arc.graphics.Color.orange;
+        } else if (efficiency >= 1f) {
+            borderColor = arc.graphics.Color.lime;
         }
         
-        if (showWarnings && fillPercent > 90f) {
-            tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]⚠ Nearly Full!").left().row();
+        if (borderColor != null) {
+            Lines.stroke(3f);
+            Draw.color(borderColor, 0.7f);
+            Lines.rect(build.x - build.block.size * 4f, 
+                      build.y - build.block.size * 4f,
+                      build.block.size * 8f,
+                      build.block.size * 8f);
+            Draw.reset();
         }
         
-        int itemCount = 0;
-        for (int i = 0; i < Vars.content.items().size && itemCount < 10; i++) {
-            var item = Vars.content.item(i);
-            int amount = build.items.get(item);
-            if (amount > 0) {
-                tooltipTable.add("  " + item.emoji() + " [" + infoColor.replace("[", "").replace("]", "") + "]" + item.localizedName + ": [" + accentColor.replace("[", "").replace("]", "") + "]" + amount).left().row();
-                itemCount++;
-            }
-        }
-    }
-
-    void addLiquidInfo(Building build) {
-        if (build.liquids == null || build.liquids.currentAmount() < 0.01f) return;
-        
-        tooltipTable.add(statColor + "─ Liquids ─").padTop(4f).row();
-        
-        float total = build.liquids.currentAmount();
-        float capacity = build.block.liquidCapacity;
-        float fillPercent = (total / capacity) * 100f;
-        
-        tooltipTable.add("💧" + statColor + "Tank: " + getPercentColor(fillPercent) + Strings.autoFixed(total, 1) + infoColor + "/" + Strings.autoFixed(capacity, 1)).left().row();
-        
-        if (!compactMode) {
-            String liquidBar = makeProgressBar(total, capacity, 10);
-            tooltipTable.add("  " + liquidBar).left().row();
-        }
-    }
-
-    void addProductionInfo(Building build) {
-        if (build.block instanceof GenericCrafter) {
-            GenericCrafter crafter = (GenericCrafter)build.block;
+        if (showTargeting && build.block instanceof Turret) {
+            Turret turret = (Turret)build.block;
             
-            if (crafter.outputItems != null && crafter.outputItems.length > 0) {
-                tooltipTable.add(statColor + "─ Production ─").padTop(4f).row();
-                
-                for (var output : crafter.outputItems) {
-                    float rate = (output.amount / crafter.craftTime) * 60f;
-                    tooltipTable.add("  → " + output.item.emoji() + " " + infoColor + Strings.autoFixed(rate, 1) + "/s").left().row();
-                }
-                
-                float efficiency = build.efficiency;
-                if (efficiency < 1f) {
-                    tooltipTable.add("  " + warningColor + "⚠ " + (int)(efficiency * 100f) + "% speed").left().row();
-                }
-            }
-        }
-    }
-
-    void addTurretInfo(Building build) {
-        if (!(build.block instanceof Turret)) return;
-        
-        Turret turret = (Turret)build.block;
-        
-        tooltipTable.add("[" + statColor.replace("[", "").replace("]", "") + "]─ Turret ─").padTop(4f).row();
-        
-        tooltipTable.add("  [" + infoColor.replace("[", "").replace("]", "") + "]Range: [" + accentColor.replace("[", "").replace("]", "") + "]" + (int)(turret.range / 8f) + " tiles").left().row();
-        
-        if (turret.reload > 0) {
-            float shotsPerMin = (60f / turret.reload) * 60f;
-            tooltipTable.add("  [" + infoColor.replace("[", "").replace("]", "") + "]Rate: [" + accentColor.replace("[", "").replace("]", "") + "]" + Strings.autoFixed(shotsPerMin, 1) + "/min").left().row();
-        }
-        
-        if (build instanceof Turret.TurretBuild) {
-            Turret.TurretBuild tb = (Turret.TurretBuild)build;
-            if (tb.hasAmmo()) {
-                tooltipTable.add("  [" + successColor.replace("[", "").replace("]", "") + "]✓ Ammo Ready").left().row();
-            } else {
-                tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]✗ No Ammo").left().row();
-            }
-        }
-        
-        if (highlightHovered) {
             Lines.stroke(2f);
             Draw.color(arc.graphics.Color.cyan, 0.3f);
             Lines.circle(build.x, build.y, turret.range);
-            Draw.reset();
-        }
-    }
-
-    void addDrillInfo(Building build) {
-        if (!(build.block instanceof Drill)) return;
-        
-        Drill drill = (Drill)build.block;
-        
-        tooltipTable.add(statColor + "─ Drill ─").padTop(4f).row();
-        
-        tooltipTable.add("  " + infoColor + "Tier: " + accentColor + drill.tier).left().row();
-        
-        if (drill.drillTime > 0) {
-            float rate = 60f / drill.drillTime;
-            tooltipTable.add("  " + infoColor + "Speed: " + accentColor + Strings.autoFixed(rate, 1) + "/s").left().row();
-        }
-        
-        Tile tile = build.tile;
-        if (tile != null && tile.drop() != null) {
-            tooltipTable.add("  ⛏ " + tile.drop().emoji() + " " + infoColor + tile.drop().localizedName).left().row();
-        }
-    }void addTeamInfo(Building build) {
-        if (!Vars.state.rules.pvp) return;
-        
-        tooltipTable.add(statColor + "─ Team ─").padTop(4f).row();
-        tooltipTable.add("  " + build.team.emoji + " " + build.team.coloredName()).left().row();
-        
-        if (build.team != Vars.player.team()) {
-            tooltipTable.add("  " + warningColor + "🛡 Enemy Structure").left().row();
-        }
-    }
-
-    void addConnectionInfo(Building build) {
-        int inputBuildings = 0;
-        int outputBuildings = 0;
-        
-        for (Building nearby : build.proximity) {
-            if (nearby.block.outputsItems() || nearby.block instanceof Conveyor) {
-                inputBuildings++;
-            }
-            if (nearby.block.hasItems || nearby.block instanceof Conveyor) {
-                outputBuildings++;
-            }
-        }
-        
-        if (inputBuildings > 0 || outputBuildings > 0) {
-            tooltipTable.add(statColor + "─ Connections ─").padTop(4f).row();
-            if (inputBuildings > 0) {
-                tooltipTable.add("  ← " + infoColor + "Inputs: " + accentColor + inputBuildings).left().row();
-            }
-            if (outputBuildings > 0) {
-                tooltipTable.add("  → " + infoColor + "Outputs: " + accentColor + outputBuildings).left().row();
-            }
-        }
-    }
-
-    void addConveyorFlowInfo(Building build) {
-        if (build.block instanceof Conveyor) {
-            Conveyor conveyor = (Conveyor)build.block;
-            float itemsPerSec = conveyor.speed * 60f;
-            tooltipTable.add("→" + statColor + "Flow: " + accentColor + Strings.autoFixed(itemsPerSec, 1) + " items/s").left().row();
-        }
-        
-        if (build.block instanceof LiquidBlock) {
-            tooltipTable.add("→" + statColor + "Liquid Conduit").left().row();
-        }
-    }
-
-    void addPowerNetworkInfo(Building build) {
-        if (build.power != null && build.power.graph != null) {
-            var graph = build.power.graph;
-            float production = graph.getPowerProduced() * 60f;
-            float consumption = graph.getPowerNeeded() * 60f;
-            float balance = production - consumption;
             
-            if (production > 0 || consumption > 0) {
-                tooltipTable.add(infoColor + "─ Power Grid ─").padTop(4f).row();
-                tooltipTable.add(statColor + "Production: " + accentColor + Strings.autoFixed(production, 1) + "/s").left().row();
-                tooltipTable.add(statColor + "Usage: " + accentColor + Strings.autoFixed(consumption, 1) + "/s").left().row();
+            if (build instanceof Turret.TurretBuild) {
+                Turret.TurretBuild tb = (Turret.TurretBuild)build;
+                float rotation = tb.rotation;
+                float range = turret.range * 0.8f;
                 
-                String balanceColor = balance > 0 ? successColor : warningColor;
-                String balanceSymbol = balance > 0 ? "+" : "";
-                tooltipTable.add(statColor + "Balance: " + balanceColor + balanceSymbol + Strings.autoFixed(balance, 1) + "/s").left().row();
+                float targetX = build.x + Angles.trnsx(rotation, range);
+                float targetY = build.y + Angles.trnsy(rotation, range);
                 
-                if (showWarnings && balance < 0) {
-                    float deficit = Math.abs(balance / production * 100f);
-                    tooltipTable.add("  " + warningColor + "⚠ Overloaded " + (int)deficit + "%").left().row();
-                }
+                Lines.stroke(2f);
+                Draw.color(arc.graphics.Color.red, 0.6f);
+                Lines.line(build.x, build.y, targetX, targetY);
+                
+                Fill.circle(targetX, targetY, 4f);
             }
+            
+            Draw.reset();
         }
     }
 
@@ -585,114 +444,115 @@ public class TooltipsPlusMod extends Mod {
         tooltipTable.clear();
         tooltipTable.visible = true;
         
-        Table titleRow = new Table();
-        if (showIcons && unit.type.fullIcon != null) {
-            titleRow.image(unit.type.fullIcon).size(24f * (fontSize + 1)).padRight(4f);
-        }
-        titleRow.add(accentColor + unit.type.localizedName).style(Styles.outlineLabel);
-        tooltipTable.add(titleRow).left().row();
-        
-        if (!compactMode) {
-            tooltipTable.add(infoColor + repeat("─", 20)).padTop(2f).padBottom(2f).row();
-        }
+        tooltipTable.add("[accent]" + unit.type.localizedName).style(Styles.outlineLabel).row();
         
         float healthPercent = (unit.health / unit.maxHealth) * 100f;
-        String healthColor = healthPercent > 75f ? successColor : healthPercent > 40f ? "[yellow]" : warningColor;
-        String icon = showIcons ? Icon.defense.toString() : "";
+        String healthColor = healthPercent > 75f ? "[lime]" : healthPercent > 40f ? "[yellow]" : "[scarlet]";
         
-        tooltipTable.add(icon + statColor + "HP: " + healthColor + (int)unit.health + infoColor + "/" + (int)unit.maxHealth).left().row();
+        tooltipTable.add(healthColor + "HP: " + (int)unit.health + "[lightgray]/" + (int)unit.maxHealth + " (" + (int)healthPercent + "%)").left().row();
         
         if (unit.type.armor > 0) {
-            tooltipTable.add("  " + infoColor + "Armor: " + accentColor + (int)unit.type.armor).left().row();
+            tooltipTable.add("[lightgray]Armor: [accent]" + (int)unit.type.armor).left().row();
         }
         
-        if (showWarnings && healthPercent < 25f) {
-            tooltipTable.add("  " + warningColor + "⚠ Critical HP!").left().row();
-        }
-        
-        if (showUnitAdvanced) {
-            String moveIcon = unit.type.flying ? "✈" : "⛏";
-            tooltipTable.add(moveIcon + statColor + "Speed: " + accentColor + Strings.autoFixed(unit.type.speed * 60f, 1)).left().row();
-            
-            if (unit.type.flying) {
-                tooltipTable.add("  [sky]Flying Unit").left().row();
+        if (learnerMode) {
+            String role = getUnitRole(unit);
+            if (role != null) {
+                tooltipTable.add("[lightgray]" + role).left().width(250f).wrap().row();
             }
         }
         
-        if (showUnitAdvanced) {
-            if (unit.type.mineSpeed > 0) {
-                tooltipTable.add("⛏" + statColor + "Mine: " + accentColor + Strings.autoFixed(unit.type.mineSpeed, 1) + "/s").left().row();
-                
-                if (unit.type.mineTier > 0) {
-                    tooltipTable.add("  " + infoColor + "Tier: " + accentColor + unit.type.mineTier).left().row();
-                }
-            }
-            
-            if (unit.type.buildSpeed > 0) {
-                tooltipTable.add("🔨" + statColor + "Build: " + accentColor + Strings.autoFixed(unit.type.buildSpeed, 1) + "/s").left().row();
-            }
-            
-            if (unit.type.itemCapacity > 0) {
-                int carrying = unit.stack != null && unit.stack.item != null ? unit.stack.amount : 0;
-                String carryColor = carrying > 0 ? accentColor : infoColor;
-                tooltipTable.add("📦" + statColor + "Carry: " + carryColor + carrying + infoColor + "/" + unit.type.itemCapacity).left().row();
-                
-                if (unit.stack != null && unit.stack.item != null && carrying > 0) {
-                    tooltipTable.add("  " + infoColor + unit.stack.item.emoji() + " " + unit.stack.item.localizedName).left().row();
-                }
-            }
+        String activity = getUnitActivity(unit);
+        if (activity != null) {
+            tooltipTable.add(activity).left().row();
         }
         
-        if (showUnitAdvanced && unit.type.weapons.size > 0) {
-            addWeaponInfo(unit);
+        if (unit.stack != null && unit.stack.item != null && unit.stack.amount > 0) {
+            tooltipTable.add("[lightgray]Carrying: " + unit.stack.item.emoji() + " [accent]" + unit.stack.amount + "[lightgray]/" + unit.type.itemCapacity).left().row();
         }
         
-        addUnitStatusInfo(unit);
+        if (unit.type.weapons.size > 0) {
+            addWeaponStats(unit);
+        }
         
-        if (Vars.state.rules.pvp && unit.team != Vars.player.team()) {
-            tooltipTable.add(warningColor + "Enemy Unit").left().row();
+        addUnitDamageStats(unit);
+        
+        if (unit.team != Vars.player.team()) {
+            tooltipTable.add("[scarlet]⚠ ENEMY - " + unit.team.emoji + " " + unit.team.name).left().row();
         } else if (unit.isPlayer()) {
-            tooltipTable.add("[royal]Player Unit").left().row();
+            tooltipTable.add("[royal]👤 Player Controlled").left().row();
+        } else {
+            tooltipTable.add("[lime]Allied - " + unit.team.emoji + " " + unit.team.name).left().row();
         }
         
         positionTooltip();
         tooltipTable.pack();
     }
 
-    void addWeaponInfo(Unit unit) {
+    String getUnitRole(Unit unit) {
+        if (unit.type.flying) {
+            if (unit.type.weapons.size > 0) {
+                return "Flying combat unit - Fast but fragile";
+            }
+            return "Flying support unit - Transport and building";
+        } else {
+            if (unit.type.mineSpeed > 0) {
+                return "Ground unit - Mining and construction";
+            } else if (unit.type.weapons.size > 0) {
+                return "Ground combat unit - Tank role";
+            }
+        }
+        return null;
+    }
+
+    String getUnitActivity(Unit unit) {
+        if (unit.mineTile != null) {
+            return "[lime]⛏ Mining resources";
+        } else if (unit.activelyBuilding()) {
+            return "[lime]🔨 Constructing";
+        } else if (unit.isShooting) {
+            return "[scarlet]⚔ In combat";
+        } else if (unit.moving()) {
+            return "[sky]→ Moving";
+        } else {
+            return "[lightgray]○ Idle";
+        }
+    }
+
+    void addWeaponStats(Unit unit) {
         float totalDPS = 0f;
         for (var weapon : unit.type.weapons) {
-            if (weapon.bullet != null) {
+            if (weapon.bullet != null && weapon.reload > 0) {
                 float dps = weapon.bullet.damage * (60f / weapon.reload);
                 totalDPS += dps;
             }
         }
         
         if (totalDPS > 0) {
-            tooltipTable.add("⚔" + statColor + "DPS: " + accentColor + Strings.autoFixed(totalDPS, 1)).left().row();
+            tooltipTable.add("[lightgray]DPS: [scarlet]" + Strings.autoFixed(totalDPS, 1)).left().row();
             
             if (unit.type.weapons.size > 1) {
-                tooltipTable.add("  " + infoColor + "Weapons: " + accentColor + unit.type.weapons.size).left().row();
+                tooltipTable.add("[lightgray]Weapons: [accent]" + unit.type.weapons.size).left().row();
             }
         }
     }
 
-    void addUnitStatusInfo(Unit unit) {
-        if (unit.mineTile != null) {
-            tooltipTable.add(statColor + "⛏ Mining...").left().row();
-        } else if (unit.activelyBuilding()) {
-            tooltipTable.add(statColor + "🔨 Building...").left().row();
-        } else if (unit.isShooting) {
-            tooltipTable.add(statColor + "⚔ Combat").left().row();
-        } else if (unit.moving()) {
-            tooltipTable.add(statColor + "→ Moving").left().row();
+    void addUnitDamageStats(Unit unit) {
+        int unitId = unit.id % 100;
+        
+        if (damageDealt[unitId] > 0) {
+            tooltipTable.add("[scarlet]⚔ Damage dealt: " + (int)damageDealt[unitId]).left().row();
+        }
+        
+        if (healingDone[unitId] > 0) {
+            tooltipTable.add("[lime]❤ Healing done: " + (int)healingDone[unitId]).left().row();
         }
     }
 
     void positionTooltip() {
         Vec2 screenPos = arc.Core.input.mouse();
-        float x = screenPos.x + 20f;
-        float y = screenPos.y + 20f;
+        float x = screenPos.x + 15f;
+        float y = screenPos.y + 15f;
         
         if (x + tooltipTable.getWidth() > arc.Core.graphics.getWidth()) {
             x = screenPos.x - tooltipTable.getWidth() - 10f;
@@ -701,380 +561,100 @@ public class TooltipsPlusMod extends Mod {
             y = screenPos.y - tooltipTable.getHeight() - 10f;
         }
         
-        if (followCursor) {
-            tooltipTable.setPosition(x, y);
-        } else {
-            tooltipTable.setPosition(
-                arc.Core.graphics.getWidth() - tooltipTable.getWidth() - 20f,
-                20f
-            );
-        }
-        
+        tooltipTable.setPosition(x, y);
         tooltipTable.color.a = tooltipOpacity / 10f;
-    }
-
-    void injectStaticDescriptions() {
-        for (Block block : Vars.content.blocks()) {
-            if (block.description != null && !block.description.contains("§")) {
-                StringBuilder extra = new StringBuilder("\n[accent]§ Stats:");
-                
-                if (block instanceof PowerGenerator) {
-                    PowerGenerator gen = (PowerGenerator)block;
-                    extra.append("\n  Power: ").append((int)(gen.powerProduction * 60f)).append("/s");
-                }
-                if (block.hasItems && block.itemCapacity > 0) {
-                    extra.append("\n  Items: ").append(block.itemCapacity);
-                }
-                if (block.hasLiquids && block.liquidCapacity > 0) {
-                    extra.append("\n  Liquid: ").append(Strings.autoFixed(block.liquidCapacity, 1));
-                }
-                if (block.health > 0) {
-                    extra.append("\n  HP: ").append((int)block.health);
-                }
-                
-                block.description += extra.toString();
-            }
-        }
-
-        for (UnitType unit : Vars.content.units()) {
-            if (unit.description != null && !unit.description.contains("§")) {
-                StringBuilder extra = new StringBuilder("\n[accent]§ Stats:");
-                extra.append("\n  HP: ").append((int)unit.health);
-                extra.append("\n  Speed: ").append(Strings.autoFixed(unit.speed * 60f, 1));
-                if (unit.armor > 0) extra.append("\n  Armor: ").append((int)unit.armor);
-                if (unit.mineSpeed > 0) extra.append("\n  Mine: ").append(Strings.autoFixed(unit.mineSpeed, 1));
-                if (unit.buildSpeed > 0) extra.append("\n  Build: ").append(Strings.autoFixed(unit.buildSpeed, 1));
-                
-                unit.description += extra.toString();
-            }
-        }
-    }
-
-    String formatNumber(float num) {
-        if (num >= 1000000) {
-            return Strings.autoFixed(num / 1000000f, 1) + "M";
-        } else if (num >= 1000) {
-            return Strings.autoFixed(num / 1000f, 1) + "K";
-        }
-        return Strings.autoFixed(num, 1);
-    }
-
-    String getPercentColor(float percent) {
-        if (percent > 75f) return successColor;
-        if (percent > 50f) return "[yellow]";
-        if (percent > 25f) return "[orange]";
-        return warningColor;
-    }
-
-    String makeProgressBar(float current, float max, int width) {
-        int filled = (int)((current / max) * width);
-        StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < width; i++) {
-            bar.append(i < filled ? "█" : "░");
-        }
-        bar.append("]");
-        return bar.toString();
     }void addSettingsUI() {
         try {
             Vars.ui.settings.addCategory("Tooltips+", Icon.book, table -> {
                 table.defaults().left().padTop(4f);
                 
-                table.add("[accent]" + repeat("═", 15) + " Main " + repeat("═", 15)).center().colspan(2).padBottom(8f).row();
+                table.add("[accent]═══ TooltipsPlus v4.0 ═══").center().colspan(2).padBottom(8f).row();
+                table.add("[lightgray]Problem-solving tooltips that help you understand issues").center().colspan(2).padBottom(12f).row();
                 
                 table.check("Enable Tooltips+", enabled, v -> {
                     enabled = v;
                     saveSettings();
                     if (v) {
                         setupTooltipSystem();
-                        Vars.ui.showInfo("[lime]Tooltips+ Enabled");
-                    } else {
-                        tooltipTable.visible = false;
-                        Vars.ui.showInfo("[scarlet]Tooltips+ Disabled");
+                        suppressVanillaTooltips();
+                        trackCombatStats();
                     }
                 }).colspan(2).left().row();
                 
-                table.add("[lightgray]Hotkeys: T = Toggle | P = Pin").colspan(2).left().padTop(4f).row();
+                table.add("[accent]═══ Core Features ═══").center().colspan(2).padTop(12f).padBottom(8f).row();
                 
-                table.add("[accent]" + repeat("═", 14) + " Display " + repeat("═", 14)).center().colspan(2).padTop(12f).padBottom(8f).row();
+                table.check("Bottleneck Detection", showBottlenecks, v -> {
+                    showBottlenecks = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                table.add("[darkgray]Shows why buildings aren't working").colspan(2).left().padTop(-4f).row();
+                
+                table.check("Time Predictions", showPredictions, v -> {
+                    showPredictions = v;
+                    saveSettings();
+                }).colspan(2).left().padTop(8f).row();
+                table.add("[darkgray]Predicts when storage fills/empties").colspan(2).left().padTop(-4f).row();
+                
+                table.check("Turret Targeting Lines", showTargeting, v -> {
+                    showTargeting = v;
+                    saveSettings();
+                }).colspan(2).left().padTop(8f).row();
+                table.add("[darkgray]Shows where turrets are aiming").colspan(2).left().padTop(-4f).row();
+                
+                table.check("Learner Mode", learnerMode, v -> {
+                    learnerMode = v;
+                    saveSettings();
+                }).colspan(2).left().padTop(8f).row();
+                table.add("[darkgray]Explains what blocks do (for new players)").colspan(2).left().padTop(-4f).row();
                 
                 table.check("Compact Mode", compactMode, v -> {
                     compactMode = v;
                     saveSettings();
-                }).colspan(2).left().row();
+                }).colspan(2).left().padTop(8f).row();
                 
-                table.check("Follow Cursor", followCursor, v -> {
-                    followCursor = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Show Icons", showIcons, v -> {
-                    showIcons = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Highlight Hovered", highlightHovered, v -> {
-                    highlightHovered = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Hover Sound", playHoverSound, v -> {
-                    playHoverSound = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.add("Color Theme: ").left();
-                table.button(colorTheme, () -> {
-                    int index = 0;
-                    String[] themes = {"default", "dark", "neon", "minimal"};
-                    for (int i = 0; i < themes.length; i++) {
-                        if (themes[i].equals(colorTheme)) {
-                            index = (i + 1) % themes.length;
-                            break;
-                        }
-                    }
-                    colorTheme = themes[index];
-                    applyColorTheme();
-                    saveSettings();
-                }).width(150f).row();
+                table.add("[accent]═══ Advanced ═══").center().colspan(2).padTop(12f).padBottom(8f).row();
                 
                 table.add("Tooltip Opacity: ").left();
-                table.slider(0, 10, 1, tooltipOpacity, v -> {
+                table.slider(5, 10, 1, tooltipOpacity, v -> {
                     tooltipOpacity = (int)v;
                     saveSettings();
                 }).width(200f).row();
                 
                 table.add("Hover Delay: ").left();
-                table.slider(0f, 1f, 0.05f, hoverDelay, v -> {
+                table.slider(0f, 0.5f, 0.05f, hoverDelay, v -> {
                     hoverDelay = v;
                     saveSettings();
                 }).width(200f).row();
+                table.add("[darkgray]Current: " + Strings.autoFixed(hoverDelay, 2) + "s").colspan(2).left().padTop(-4f).row();
                 
-                table.add("[lightgray](" + Strings.autoFixed(hoverDelay, 2) + "s)").colspan(2).left().padTop(-4f).row();
+                table.add("[accent]═══ Info ═══").center().colspan(2).padTop(12f).padBottom(8f).row();
+                table.add("[lightgray]Press T to toggle tooltips").colspan(2).center().row();
+                table.add("[sky]Features: Damage tracking, predictions, smart analysis").colspan(2).center().padTop(4f).row();
+                table.add("[lime]Vanilla tooltips replaced automatically").colspan(2).center().padTop(4f).row();
                 
-                table.add("Font Size: ").left();
-                table.slider(0, 2, 1, fontSize, v -> {
-                    fontSize = (int)v;
+                table.button("Reset Settings", Icon.refresh, () -> {
+                    enabled = true;
+                    showBottlenecks = true;
+                    showPredictions = true;
+                    showTargeting = true;
+                    learnerMode = false;
+                    compactMode = false;
+                    tooltipOpacity = 9;
+                    hoverDelay = 0.08f;
                     saveSettings();
-                }).width(200f).row();
-                
-                String[] fontLabels = {"Small", "Normal", "Large"};
-                table.add("[lightgray]" + fontLabels[fontSize]).colspan(2).left().padTop(-4f).row();
-                
-                table.add("[accent]" + repeat("═", 13) + " Features " + repeat("═", 13)).center().colspan(2).padTop(12f).padBottom(8f).row();
-                
-                table.check("Power Details", showPowerDetails, v -> {
-                    showPowerDetails = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Item Flow Rates", showItemFlow, v -> {
-                    showItemFlow = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Advanced Unit Info", showUnitAdvanced, v -> {
-                    showUnitAdvanced = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Show Warnings", showWarnings, v -> {
-                    showWarnings = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Turret Analytics", showTurretInfo, v -> {
-                    showTurretInfo = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Drill Analytics", showDrillInfo, v -> {
-                    showDrillInfo = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Connection Info", showConnectionInfo, v -> {
-                    showConnectionInfo = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Storage Breakdown", showStorageBreakdown, v -> {
-                    showStorageBreakdown = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Production History", showProductionHistory, v -> {
-                    showProductionHistory = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Repair Indicators", showRepairInfo, v -> {
-                    showRepairInfo = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.check("Team Stats (PvP)", showTeamStats, v -> {
-                    showTeamStats = v;
-                    saveSettings();
-                }).colspan(2).left().row();
-                
-                table.add("[accent]" + repeat("═", 12) + " Presets " + repeat("═", 12)).center().colspan(2).padTop(12f).padBottom(8f).row();
-                
-                Table presetRow1 = new Table();
-                presetRow1.button("Minimal", Icon.zoom, () -> {
-                    applyPreset("minimal");
-                    Vars.ui.showInfo("[lime]Applied Minimal preset");
-                }).size(140f, 50f).pad(4f);
-                
-                presetRow1.button("Balanced", Icon.settings, () -> {
-                    applyPreset("balanced");
-                    Vars.ui.showInfo("[lime]Applied Balanced preset");
-                }).size(140f, 50f).pad(4f);
-                
-                table.add(presetRow1).colspan(2).center().padTop(8f).row();
-                
-                Table presetRow2 = new Table();
-                presetRow2.button("Maximum", Icon.zoom, () -> {
-                    applyPreset("maximum");
-                    Vars.ui.showInfo("[lime]Applied Maximum preset");
-                }).size(140f, 50f).pad(4f);
-                
-                presetRow2.button("Combat", Icon.units, () -> {
-                    applyPreset("combat");
-                    Vars.ui.showInfo("[lime]Applied Combat preset");
-                }).size(140f, 50f).pad(4f);
-                
-                table.add(presetRow2).colspan(2).center().padTop(4f).row();
-                
-                table.add("[accent]" + repeat("═", 15) + " Info " + repeat("═", 15)).center().colspan(2).padTop(12f).padBottom(8f).row();
-                
-                table.add("[lightgray]Hover over buildings and units\nto see detailed tooltips").colspan(2).center().padTop(8f).row();
-                
-                table.add("[sky]Version 3.0 - Full Featured").colspan(2).center().padTop(8f).row();
-                
-                table.button("Reset to Defaults", Icon.refresh, () -> {
-                    resetToDefaults();
-                    Vars.ui.showInfo("[lime]Reset to defaults");
+                    Vars.ui.showInfo("[lime]Settings reset");
                 }).size(200f, 50f).colspan(2).center().padTop(16f);
+                
+                table.button("Clear Combat Stats", Icon.trash, () -> {
+                    for (int i = 0; i < damageDealt.length; i++) {
+                        damageDealt[i] = 0;
+                        healingDone[i] = 0;
+                    }
+                    Vars.ui.showInfo("[lime]Combat stats cleared");
+                }).size(200f, 50f).colspan(2).center().padTop(8f);
             });
         } catch (Throwable ex) {
             Log.err("TooltipsPlus: Failed to add settings UI", ex);
         }
-    }void applyPreset(String preset) {
-        switch (preset) {
-            case "minimal":
-                enabled = true;
-                compactMode = true;
-                showPowerDetails = false;
-                showItemFlow = false;
-                showUnitAdvanced = false;
-                showWarnings = false;
-                showIcons = false;
-                showTurretInfo = false;
-                showConnectionInfo = false;
-                showDrillInfo = false;
-                showTeamStats = false;
-                showRepairInfo = false;
-                showStorageBreakdown = false;
-                showProductionHistory = false;
-                tooltipOpacity = 6;
-                hoverDelay = 0.3f;
-                colorTheme = "minimal";
-                fontSize = 0;
-                break;
-                
-            case "balanced":
-                enabled = true;
-                compactMode = false;
-                showPowerDetails = true;
-                showItemFlow = true;
-                showUnitAdvanced = true;
-                showWarnings = true;
-                showIcons = true;
-                showTurretInfo = true;
-                showConnectionInfo = true;
-                showDrillInfo = true;
-                showTeamStats = true;
-                showRepairInfo = true;
-                showStorageBreakdown = true;
-                showProductionHistory = false;
-                tooltipOpacity = 8;
-                hoverDelay = 0.15f;
-                colorTheme = "default";
-                fontSize = 1;
-                break;
-                
-            case "maximum":
-                enabled = true;
-                compactMode = false;
-                showPowerDetails = true;
-                showItemFlow = true;
-                showUnitAdvanced = true;
-                showWarnings = true;
-                showIcons = true;
-                showTurretInfo = true;
-                showConnectionInfo = true;
-                showDrillInfo = true;
-                showTeamStats = true;
-                showRepairInfo = true;
-                showStorageBreakdown = true;
-                showProductionHistory = true;
-                tooltipOpacity = 9;
-                hoverDelay = 0.05f;
-                colorTheme = "default";
-                fontSize = 1;
-                highlightHovered = true;
-                break;
-                
-            case "combat":
-                enabled = true;
-                compactMode = true;
-                showPowerDetails = false;
-                showItemFlow = false;
-                showUnitAdvanced = true;
-                showWarnings = true;
-                showIcons = true;
-                showTurretInfo = true;
-                showConnectionInfo = false;
-                showDrillInfo = false;
-                showTeamStats = true;
-                showRepairInfo = true;
-                showStorageBreakdown = false;
-                showProductionHistory = false;
-                tooltipOpacity = 7;
-                hoverDelay = 0.1f;
-                colorTheme = "neon";
-                fontSize = 1;
-                break;
-        }
-        applyColorTheme();
-        saveSettings();
-    }
-
-    void resetToDefaults() {
-        enabled = true;
-        compactMode = false;
-        showPowerDetails = true;
-        showItemFlow = true;
-        showUnitAdvanced = true;
-        showWarnings = true;
-        showIcons = true;
-        showTurretInfo = true;
-        showConnectionInfo = true;
-        showDrillInfo = true;
-        showTeamStats = true;
-        showRepairInfo = true;
-        showStorageBreakdown = true;
-        showProductionHistory = true;
-        tooltipOpacity = 8;
-        followCursor = true;
-        hoverDelay = 0.15f;
-        fontSize = 1;
-        colorTheme = "default";
-        playHoverSound = false;
-        highlightHovered = true;
-        showOnMinimap = false;
-        maxTooltipLines = 20;
-        applyColorTheme();
-        saveSettings();
     }
 }
