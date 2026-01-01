@@ -44,6 +44,7 @@ public class TooltipsPlusMod extends Mod {
     }
     
     void enhanceBlockTooltip(Block block) {
+        if(block.description == null) block.description = "";
         String original = block.description;
         StringBuilder enhanced = new StringBuilder(original);
         
@@ -64,7 +65,7 @@ public class TooltipsPlusMod extends Mod {
             }
         }
         
-        if(block.requirements.length > 0) {
+        if(block.requirements != null && block.requirements.length > 0) {
             int totalCost = 0;
             for(int i = 0; i < block.requirements.length; i++) {
                 totalCost += block.requirements[i].amount;
@@ -83,6 +84,7 @@ public class TooltipsPlusMod extends Mod {
     }
     
     void enhanceUnitTooltip(UnitType unit) {
+        if(unit.description == null) unit.description = "";
         String original = unit.description;
         StringBuilder enhanced = new StringBuilder(original);
         
@@ -112,6 +114,7 @@ public class TooltipsPlusMod extends Mod {
     }
     
     void enhanceItemTooltip(Item item) {
+        if(item.description == null) item.description = "";
         String original = item.description;
         StringBuilder enhanced = new StringBuilder(original);
         
@@ -138,6 +141,7 @@ public class TooltipsPlusMod extends Mod {
     }
     
     void enhanceLiquidTooltip(Liquid liquid) {
+        if(liquid.description == null) liquid.description = "";
         String original = liquid.description;
         StringBuilder enhanced = new StringBuilder(original);
         
