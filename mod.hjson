@@ -1,38 +1,11 @@
-name: "modinfo-plus"
-displayName: "[cyan]ModInfo+[] [accent]Enhanced[]"
-author: "[accent]SamielXD[]"
-description: '''
-[accent]ModInfo+ Enhanced Browser v1.0[]
-
-[cyan]Imported to Java for better performance![]
-
-Enhanced mod browser with language badges, search, and real-time GitHub statistics.
-
-[accent]━━━━━━━━━━━━━━━━━━[]
-
-🌟 [accent]Features[]
-
-[lime]✓[] Language badges (Java/JS)
-[lime]✓[] Search mods by name/author
-[lime]✓[] Real-time GitHub stats
-[lime]✓[] Download counts & stars
-[lime]✓[] Replaces default browser
-[lime]✓[] Fast async loading
-
-[accent]━━━━━━━━━━━━━━━━━━[]
-
-🎮 [accent]How to Use[]
-
-Open [cyan]Mods[] → [accent]Mod Browser[]
-Search or browse mods with badges
-Click icons for details or GitHub
-
-[accent]━━━━━━━━━━━━━━━━━━[]
-
-Thanks for using ModInfo+! 🎉
-'''
-version: "1.0"
-minGameVersion: "154"
-main: "ModInfoPlus"
-dependencies: []
-hidden: false
+{
+  "name": "tooltips+",
+  "displayName": "ToolTips+",
+  "author": "YourName",
+  "description": "Enhanced tooltips showing extra stats",
+  "version": "1.0",
+  "minGameVersion": "154",
+  "dependencies": [],
+  "hidden": false,
+  "main": "tooltipsplus.TooltipsPlusMod"
+}
