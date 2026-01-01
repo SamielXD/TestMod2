@@ -82,7 +82,7 @@ public class ModInfoPlus extends Mod {
     private TextureRegion jsBadge;
 
     public ModInfoPlus() {
-        Log.info("ModInfo+ HELIUM Architecture Initialized");
+        Log.info("ModInfo+ Initialized");
         initTokens();
         loadSettings();
     }
@@ -207,9 +207,7 @@ public class ModInfoPlus extends Mod {
                 showModInfoBrowser();
             });
         });
-    }
-    
-    void buildUnifiedModList() {
+    }void buildUnifiedModList() {
         updateStatusLabel("[cyan]Building unified mod list...");
         
         githubGet(
@@ -259,7 +257,9 @@ public class ModInfoPlus extends Mod {
                 }
             }
         }
-    }void detectAllCapabilities() {
+    }
+
+    void detectAllCapabilities() {
         for(ModInfo mod : unifiedModList) {
             if(mod.isInstalled && mod.installedMod != null) {
                 continue;
@@ -452,15 +452,13 @@ public class ModInfoPlus extends Mod {
             Log.err("Parse remote index failed", e);
         }
         return mods;
-    }
-    
-    void addModInfoSettings() {
+    }void addModInfoSettings() {
         Vars.ui.settings.addCategory("ModInfo+ Browser", Icon.book, table -> {
             table.add("[accent]ModInfo+ Browser Settings").pad(10f).row();
             table.image().height(3f).width(400f).color(accentColor).pad(5f).row();
             
             table.add("[cyan]Display Settings").left().pad(8f).row();
-            table.add("[lightgray]These changes require reopening the browser").left().padLeft(20f).row();
+            table.add("[lightgray]Changes require game restart").left().padLeft(20f).row();
             
             table.table(t -> {
                 t.add("UI Scale: ").left().padRight(10f);
@@ -521,7 +519,7 @@ public class ModInfoPlus extends Mod {
             
             table.image().height(2f).width(400f).color(Color.gray).pad(8f).row();
             table.add("[cyan]Badge Settings").left().pad(8f).row();
-            table.add("[lightgray]These changes require reopening the browser").left().padLeft(20f).row();
+            table.add("[lightgray]Changes require game restart").left().padLeft(20f).row();
             
             table.table(t -> {
                 t.add("Badge Display Width: ").left().padRight(10f);
@@ -617,7 +615,7 @@ public class ModInfoPlus extends Mod {
                 Vars.ui.showInfo("[lime]Settings reset to defaults");
             }).size(250f, 50f).pad(10f);
             
-            table.add("[lightgray]ModInfo+ v2.5 HELIUM").pad(10f);
+            table.add("[lightgray]ModInfo+ v2.5").pad(10f);
         });
     }
     
@@ -1552,7 +1550,9 @@ public class ModInfoPlus extends Mod {
                 statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
             }
         });
-    }class ModInfo {
+    }
+
+    class ModInfo {
         String repo = "";
         String name = "";
         String displayName = "";
