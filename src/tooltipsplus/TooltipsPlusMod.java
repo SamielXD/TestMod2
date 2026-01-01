@@ -59,17 +59,19 @@ public class TooltipsPlusMod extends Mod {
         }
         
         if(block.hasPower) {
-            if(block.consumes.hasPower()) {
-                float usage = block.consumes.getPower().usage * 60f;
-                enhanced.append("\nPower: -").append(Strings.autoFixed(usage, 2)).append("/s");
-            }
             if(block instanceof PowerGenerator gen) {
                 enhanced.append("\nPower: +").append(Strings.autoFixed(gen.powerProduction * 60f, 2)).append("/s");
             }
         }
         
-        if(block.requirements.length > 0 && block.buildCost > 100) {
-            enhanced.append("\nBuild time: ").append(Strings.autoFixed(block.buildCost / 60f, 1)).append("s");
+        if(block.requirements.length > 0) {
+            int totalCost = 0;
+            for(int i = 0; i < block.requirements.length; i++) {
+                totalCost += block.requirements[i].amount;
+            }
+            if(totalCost > 100) {
+                enhanced.append("\nBuild cost: ").append(totalCost).append(" items");
+            }
         }
         
         if(block.size > 1) {
