@@ -1,8 +1,9 @@
 package tooltipsplus;
 
+import arc.graphics.g2d.*;
+import arc.math.geom.*;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
-import arc.struct.Seq;
 import arc.util.*;
 import mindustry.*;
 import mindustry.gen.*;
@@ -21,6 +22,8 @@ public class TooltipsPlusMod extends Mod {
     boolean showItemFlags = true;
     boolean debug = false;
 
+    Table tooltipTable;
+    
     public TooltipsPlusMod() {
         // load settings
         enabled = arc.Core.settings.getBool("tooltipsplus-enabled", true);
@@ -49,83 +52,115 @@ public class TooltipsPlusMod extends Mod {
     }
 
     void setupHoverTooltips() {
-        // Hook into the UI update loop to show tooltips on hover
-        Vars.ui.hudGroup.update(() -> {
-            if (!enabled) return;
-            
-            // Get the tile/unit under cursor
-            Tile hoverTile = Vars.world.tileWorld(arc.Core.input.mouseWorld().x, arc.Core.input.mouseWorld().y);
-            
-            // Show tooltip for buildings
-            if (hoverTile != null && hoverTile.build != null) {
-                Building build = hoverTile.build;
-                showBuildingTooltip(build);
+        // Create persistent tooltip table
+        tooltipTable = new Table(Styles.black6);
+        tooltipTable.margin(4f);
+        tooltipTable.visible = false;
+        Vars.ui.hudGroup.addChild(tooltipTable);
+        
+        // Hook into the render loop to show tooltips on hover
+        Events.run(EventType.Trigger.draw, () -> {
+            if (!enabled || Vars.state.isMenu()) {
+                tooltipTable.visible = false;
+                return;
             }
             
-            // Show tooltip for units
-            Unit hoverUnit = Units.closestOverlap(Vars.player.team(), arc.Core.input.mouseWorld().x, arc.Core.input.mouseWorld().y, 8f, u -> true);
+            Vec2 mousePos = arc.Core.input.mouseWorld();
+            
+            // Check for building under cursor
+            Tile hoverTile = Vars.world.tileWorld(mousePos.x, mousePos.y);
+            if (hoverTile != null && hoverTile.build != null) {
+                showBuildingTooltip(hoverTile.build);
+                return;
+            }
+            
+            // Check for unit under cursor
+            Unit hoverUnit = Groups.unit.find(u -> {
+                return u.within(mousePos.x, mousePos.y, u.hitSize);
+            });
+            
             if (hoverUnit != null) {
                 showUnitTooltip(hoverUnit);
+                return;
             }
+            
+            // Hide tooltip if nothing is hovered
+            tooltipTable.visible = false;
         });
     }
 
     void showBuildingTooltip(Building build) {
-        Table tooltip = new Table(Styles.black6);
-        tooltip.margin(4f);
+        tooltipTable.clear();
+        tooltipTable.visible = true;
         
-        tooltip.add("[accent]" + build.block.localizedName).row();
-        tooltip.add("[lightgray]─────────────").row();
+        tooltipTable.add("[accent]" + build.block.localizedName).row();
+        tooltipTable.add("[lightgray]─────────────").row();
         
         // Power info
         if (build.block instanceof PowerGenerator gen) {
-            tooltip.add("[stat]Power: [accent]" + (int)(gen.powerProduction * 60f) + "/s").left().row();
+            tooltipTable.add("[stat]Power: [accent]" + (int)(gen.powerProduction * 60f) + "/s").left().row();
+        }
+        
+        // Power consumption
+        if (build.block.consumes.hasPower()) {
+            float powerUse = build.block.consumes.getPower().usage * 60f;
+            if (powerUse > 0) {
+                tooltipTable.add("[stat]Power Use: [accent]" + Strings.autoFixed(powerUse, 1) + "/s").left().row();
+            }
         }
         
         // Item capacity
         if (build.block.hasItems && build.block.itemCapacity > 0) {
-            tooltip.add("[stat]Item Cap: [accent]" + build.block.itemCapacity).left().row();
+            tooltipTable.add("[stat]Item Cap: [accent]" + build.block.itemCapacity).left().row();
             // Show current items
-            if (build.items != null) {
-                tooltip.add("[stat]Items: [accent]" + build.items.total() + "/" + build.block.itemCapacity).left().row();
+            if (build.items != null && build.items.total() > 0) {
+                tooltipTable.add("[stat]Current: [accent]" + build.items.total()).left().row();
             }
         }
         
         // Liquid capacity
         if (build.block.hasLiquids && build.block.liquidCapacity > 0) {
-            tooltip.add("[stat]Liquid Cap: [accent]" + Strings.autoFixed(build.block.liquidCapacity, 1)).left().row();
+            tooltipTable.add("[stat]Liquid Cap: [accent]" + Strings.autoFixed(build.block.liquidCapacity, 1)).left().row();
         }
         
         // Health
-        tooltip.add("[stat]Health: [accent]" + (int)build.health + "/" + (int)build.maxHealth).left().row();
+        tooltipTable.add("[stat]Health: [accent]" + (int)build.health + "/" + (int)build.maxHealth).left().row();
         
-        Vars.ui.showTooltip(tooltip);
+        // Position tooltip near cursor
+        Vec2 screenPos = arc.Core.input.mouse();
+        tooltipTable.setPosition(screenPos.x + 20f, screenPos.y + 20f);
+        tooltipTable.pack();
+        tooltipTable.act(arc.Core.graphics.getDeltaTime());
     }
 
     void showUnitTooltip(Unit unit) {
-        Table tooltip = new Table(Styles.black6);
-        tooltip.margin(4f);
+        tooltipTable.clear();
+        tooltipTable.visible = true;
         
-        tooltip.add("[accent]" + unit.type.localizedName).row();
-        tooltip.add("[lightgray]─────────────").row();
+        tooltipTable.add("[accent]" + unit.type.localizedName).row();
+        tooltipTable.add("[lightgray]─────────────").row();
         
-        tooltip.add("[stat]Health: [accent]" + (int)unit.health + "/" + (int)unit.maxHealth).left().row();
-        tooltip.add("[stat]Armor: [accent]" + (int)unit.type.armor).left().row();
-        tooltip.add("[stat]Speed: [accent]" + Strings.autoFixed(unit.type.speed, 1)).left().row();
+        tooltipTable.add("[stat]Health: [accent]" + (int)unit.health + "/" + (int)unit.maxHealth).left().row();
+        tooltipTable.add("[stat]Armor: [accent]" + (int)unit.type.armor).left().row();
+        tooltipTable.add("[stat]Speed: [accent]" + Strings.autoFixed(unit.type.speed, 1)).left().row();
         
         if (unit.type.flying) {
-            tooltip.add("[stat]Flying: [accent]Yes").left().row();
+            tooltipTable.add("[stat]Flying: [accent]Yes").left().row();
         }
         
         if (unit.type.mineSpeed > 0) {
-            tooltip.add("[stat]Mine Speed: [accent]" + Strings.autoFixed(unit.type.mineSpeed, 1)).left().row();
+            tooltipTable.add("[stat]Mine Speed: [accent]" + Strings.autoFixed(unit.type.mineSpeed, 1)).left().row();
         }
         
         if (unit.type.buildSpeed > 0) {
-            tooltip.add("[stat]Build Speed: [accent]" + Strings.autoFixed(unit.type.buildSpeed, 1)).left().row();
+            tooltipTable.add("[stat]Build Speed: [accent]" + Strings.autoFixed(unit.type.buildSpeed, 1)).left().row();
         }
         
-        Vars.ui.showTooltip(tooltip);
+        // Position tooltip near cursor
+        Vec2 screenPos = arc.Core.input.mouse();
+        tooltipTable.setPosition(screenPos.x + 20f, screenPos.y + 20f);
+        tooltipTable.pack();
+        tooltipTable.act(arc.Core.graphics.getDeltaTime());
     }
 
     void injectTooltips() {
