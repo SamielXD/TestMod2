@@ -425,11 +425,11 @@ public class TooltipsPlusMod extends Mod {
     }
 
     void addLiquidInfo(Building build) {
-        if (build.liquids == null || build.liquids.total() < 0.01f) return;
+        if (build.liquids == null || build.liquids.currentAmount() < 0.01f) return;
         
         tooltipTable.add(statColor + "─ Liquids ─").padTop(4f).row();
         
-        float total = build.liquids.total();
+        float total = build.liquids.currentAmount();
         float capacity = build.block.liquidCapacity;
         float fillPercent = (total / capacity) * 100f;
         
