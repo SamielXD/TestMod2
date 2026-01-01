@@ -42,8 +42,9 @@ public class ModInfoPlus extends Mod {
     private static final int MAX_REQUESTS_PER_TOKEN = 50;
     private static final long RATE_LIMIT_RESET_TIME = 3600000;
     
-    private Seq<ModInfo> unifiedModList = new Seq<>();
-    private Seq<ModInfo> filteredMods = new Seq<>();
+    private Seq<ModInfo> remoteMods = new Seq<>();
+    private Seq<ModInfo> installedMods = new Seq<>();
+    private Seq<ModInfo> displayList = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> iconCache = new ObjectMap<>();
     private ObjectMap<String, Texture> remoteIconTextures = new ObjectMap<>();
@@ -207,64 +208,77 @@ public class ModInfoPlus extends Mod {
                 showModInfoBrowser();
             });
         });
-    }void buildUnifiedModList() {
-        updateStatusLabel("[cyan]Building unified mod list...");
+    }void buildModLists() {
+        updateStatusLabel("[cyan]Loading mods...");
         
-        githubGet(
-            "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
-            json -> {
-                unifiedModList = parseRemoteIndex(json);
-                overlayLocalInstallData();
-                detectAllCapabilities();
-                loadAllIcons();
-                applyFilter();
-                updateVisibleMods();
-            },
-            () -> {
-                updateStatusLabel("[scarlet]Failed to load mod index");
-                buildOfflineModList();
-            }
-        );
-    }
-    
-    void buildOfflineModList() {
-        unifiedModList.clear();
-        for(Mods.LoadedMod installed : Vars.mods.list()) {
-            ModInfo info = createModInfoFromInstalled(installed);
-            unifiedModList.add(info);
+        installedMods.clear();
+        for(Mods.LoadedMod mod : Vars.mods.list()) {
+            ModInfo info = createModInfoFromInstalled(mod);
+            installedMods.add(info);
         }
-        applyFilter();
-        updateVisibleMods();
+        
+        if(currentTab == 2) {
+            updateStatusLabel("[cyan]Fetching remote index...");
+            githubGet(
+                "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
+                json -> {
+                    remoteMods.clear();
+                    remoteMods = parseRemoteIndex(json);
+                    overlayInstallData();
+                    detectRemoteCapabilities();
+                    loadRemoteIcons();
+                    rebuildDisplayList();
+                },
+                () -> {
+                    updateStatusLabel("[scarlet]Failed to load remote index");
+                    rebuildDisplayList();
+                }
+            );
+        } else {
+            rebuildDisplayList();
+        }
     }
     
-    void overlayLocalInstallData() {
-        for(ModInfo mod : unifiedModList) {
-            for(Mods.LoadedMod installed : Vars.mods.list()) {
-                String installedName = installed.meta != null ? installed.meta.name : installed.name;
-                if(installedName.equalsIgnoreCase(mod.name) || installedName.equalsIgnoreCase(mod.displayName)) {
-                    mod.isInstalled = true;
-                    mod.isEnabled = installed.enabled();
-                    mod.installedMod = installed;
-                    mod.localVersion = installed.meta != null ? installed.meta.version : "?";
+    void overlayInstallData() {
+        for(ModInfo remote : remoteMods) {
+            for(ModInfo installed : installedMods) {
+                if(matchesMod(remote, installed)) {
+                    remote.isInstalled = true;
+                    remote.isEnabled = installed.isEnabled;
+                    remote.installedMod = installed.installedMod;
+                    remote.localVersion = installed.version;
+                    remote.hasJava = installed.hasJava;
+                    remote.hasScripts = installed.hasScripts;
+                    remote.touchesUI = installed.touchesUI;
+                    remote.touchesContent = installed.touchesContent;
+                    remote.clientOnly = installed.clientOnly;
+                    remote.serverCompatible = installed.serverCompatible;
                     
-                    if(installed.iconTexture != null) {
-                        String key = mod.name.toLowerCase();
-                        iconCache.put(key, new TextureRegion(installed.iconTexture));
+                    if(installed.installedMod != null && installed.installedMod.iconTexture != null) {
+                        String key = remote.name.toLowerCase();
+                        iconCache.put(key, new TextureRegion(installed.installedMod.iconTexture));
                     }
-                    
-                    detectLocalCapabilities(mod, installed);
                     break;
                 }
             }
         }
     }
-
-    void detectAllCapabilities() {
-        for(ModInfo mod : unifiedModList) {
-            if(mod.isInstalled && mod.installedMod != null) {
-                continue;
-            }
-            
+    
+    boolean matchesMod(ModInfo remote, ModInfo installed) {
+        String remoteName = remote.name.toLowerCase();
+        String remoteDisplay = remote.displayName.toLowerCase();
+        String installedName = installed.name.toLowerCase();
+        String installedDisplay = installed.displayName.toLowerCase();
+        
+        return remoteName.equals(installedName) || 
+               remoteName.equals(installedDisplay) ||
+               remoteDisplay.equals(installedName) ||
+               remoteDisplay.equals(installedDisplay);
+    }
+    
+    void detectRemoteCapabilities() {
+        for(ModInfo mod : remoteMods) {
+            if(mod.isInstalled) continue;
             if(mod.repo.isEmpty()) continue;
             
             String key = "cap_" + mod.repo;
@@ -343,22 +357,17 @@ public class ModInfoPlus extends Mod {
         }
     }
     
-    void loadAllIcons() {
-        for(ModInfo mod : unifiedModList) {
-            String key = mod.name.toLowerCase();
+    void loadRemoteIcons() {
+        for(ModInfo mod : remoteMods) {
+            if(mod.isInstalled) continue;
             
+            String key = mod.name.toLowerCase();
             if(iconCache.containsKey(key)) continue;
             if(iconLoadQueue.contains(key)) continue;
+            if(mod.repo.isEmpty()) continue;
             
-            if(mod.isInstalled && mod.installedMod != null && mod.installedMod.iconTexture != null) {
-                iconCache.put(key, new TextureRegion(mod.installedMod.iconTexture));
-                continue;
-            }
-            
-            if(!mod.repo.isEmpty()) {
-                iconLoadQueue.add(key);
-                loadIconFromGitHub(mod, "master", "icon.png");
-            }
+            iconLoadQueue.add(key);
+            loadIconFromGitHub(mod, "master", "icon.png");
         }
     }
     
@@ -452,6 +461,62 @@ public class ModInfoPlus extends Mod {
             Log.err("Parse remote index failed", e);
         }
         return mods;
+    }
+    
+    void rebuildDisplayList() {
+        displayList.clear();
+        
+        if(currentTab == 0) {
+            for(ModInfo mod : installedMods) {
+                if(mod.isEnabled) displayList.add(mod);
+            }
+        } else if(currentTab == 1) {
+            for(ModInfo mod : installedMods) {
+                if(!mod.isEnabled) displayList.add(mod);
+            }
+        } else {
+            displayList.addAll(remoteMods);
+        }
+        
+        applyFilter();
+    }
+    
+    void applyFilter() {
+        Seq<ModInfo> filtered = new Seq<>();
+        
+        for(ModInfo mod : displayList) {
+            boolean matchesSearch = searchQuery.isEmpty() || 
+                mod.displayName.toLowerCase().contains(searchQuery) || 
+                mod.name.toLowerCase().contains(searchQuery) ||
+                mod.author.toLowerCase().contains(searchQuery) ||
+                mod.description.toLowerCase().contains(searchQuery);
+            
+            if(!matchesSearch) continue;
+            
+            boolean matchesFilter = true;
+            if(filterMode.equals("java")) matchesFilter = mod.hasJava;
+            else if(filterMode.equals("js")) matchesFilter = mod.hasScripts;
+            else if(filterMode.equals("server")) matchesFilter = mod.serverCompatible;
+            
+            if(matchesFilter) {
+                filtered.add(mod);
+            }
+        }
+        
+        displayList.clear();
+        displayList.addAll(filtered);
+        applySorting();
+    }
+    
+    void applySorting() {
+        if(currentTab == 2) {
+            if(sortMode == 0) {
+                displayList.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
+            } else {
+                displayList.sort((a, b) -> Integer.compare(b.stars, a.stars));
+            }
+        }
+        updateVisibleMods();
     }void addModInfoSettings() {
         Vars.ui.settings.addCategory("ModInfo+ Browser", Icon.book, table -> {
             table.add("[accent]ModInfo+ Browser Settings").pad(10f).row();
@@ -660,7 +725,7 @@ public class ModInfoPlus extends Mod {
         mainDialog.cont.add(main).size(width, height);
         mainDialog.show();
         
-        buildUnifiedModList();
+        buildModLists();
     }
     
     void buildPortraitLayout(Table main) {
@@ -826,60 +891,16 @@ public class ModInfoPlus extends Mod {
         filterMode = "all";
         if(searchField != null) searchField.setText("");
         buildHeader();
-        
-        if(tab == 0 || tab == 1) {
-            buildOfflineModList();
-        } else {
-            buildUnifiedModList();
-        }
+        buildModLists();
     }
     
     void reloadMods() {
-        unifiedModList.clear();
-        filteredMods.clear();
+        remoteMods.clear();
+        installedMods.clear();
+        displayList.clear();
         statsCache.clear();
         iconLoadQueue.clear();
-        buildUnifiedModList();
-    }
-    
-    void applyFilter() {
-        filteredMods.clear();
-        
-        for(ModInfo mod : unifiedModList) {
-            boolean matchesTab = true;
-            if(currentTab == 0) matchesTab = mod.isInstalled && mod.isEnabled;
-            else if(currentTab == 1) matchesTab = mod.isInstalled && !mod.isEnabled;
-            
-            if(!matchesTab) continue;
-            
-            boolean matchesSearch = searchQuery.isEmpty() || 
-                mod.displayName.toLowerCase().contains(searchQuery) || 
-                mod.name.toLowerCase().contains(searchQuery) ||
-                mod.author.toLowerCase().contains(searchQuery) ||
-                mod.description.toLowerCase().contains(searchQuery);
-            
-            if(!matchesSearch) continue;
-            
-            boolean matchesFilter = true;
-            if(filterMode.equals("java")) matchesFilter = mod.hasJava;
-            else if(filterMode.equals("js")) matchesFilter = mod.hasScripts;
-            else if(filterMode.equals("server")) matchesFilter = mod.serverCompatible;
-            
-            if(matchesFilter) {
-                filteredMods.add(mod);
-            }
-        }
-        
-        applySorting();
-    }
-    
-    void applySorting() {
-        if(sortMode == 0) {
-            filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
-        } else {
-            filteredMods.sort((a, b) -> Integer.compare(b.stars, a.stars));
-        }
-        updateVisibleMods();
+        buildModLists();
     }
     
     void updateVisibleMods() {
@@ -888,27 +909,27 @@ public class ModInfoPlus extends Mod {
         
         if(currentTab == 2) {
             int start = currentPage * modsPerPage;
-            int end = Math.min(start + modsPerPage, filteredMods.size);
+            int end = Math.min(start + modsPerPage, displayList.size);
             
-            if(filteredMods.isEmpty()) {
+            if(displayList.isEmpty()) {
                 modListContainer.add("[lightgray]No mods found").pad(40f);
             } else {
                 for(int i = start; i < end; i++) {
-                    buildModRow(modListContainer, filteredMods.get(i));
+                    buildModRow(modListContainer, displayList.get(i));
                 }
             }
             buildPaginationBar();
         } else {
-            if(filteredMods.isEmpty()) {
+            if(displayList.isEmpty()) {
                 modListContainer.add("[lightgray]No mods found").pad(40f);
             } else {
-                for(ModInfo mod : filteredMods) {
+                for(ModInfo mod : displayList) {
                     buildModRow(modListContainer, mod);
                 }
             }
         }
         
-        updateStatusLabel("Showing " + filteredMods.size + " mods");
+        updateStatusLabel("Showing " + displayList.size + " mods");
     }
     
     void buildPaginationBar() {
@@ -943,7 +964,7 @@ public class ModInfoPlus extends Mod {
     }
     
     int getMaxPage() {
-        return Math.max(0, (filteredMods.size - 1) / modsPerPage);
+        return Math.max(0, (displayList.size - 1) / modsPerPage);
     }
     
     void buildModRow(Table table, ModInfo mod) {
