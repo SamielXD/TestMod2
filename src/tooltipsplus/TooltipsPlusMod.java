@@ -95,9 +95,7 @@ public class TooltipsPlusMod extends Mod {
             try {
                 if (Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
                     var blockInfo = Vars.ui.hudfrag.blockfrag;
-                    if (blockInfo.visible) {
-                        blockInfo.visible = false;
-                    }
+                    blockInfo.setVisible(false);
                 }
             } catch (Exception e) {
             }
@@ -136,7 +134,7 @@ public class TooltipsPlusMod extends Mod {
         Events.on(EventType.UnitDamageEvent.class, event -> {
             if (event.unit != null) {
                 int unitId = event.unit.id % 100;
-                damageDealt[unitId] += event.amount;
+                damageDealt[unitId] += event.bullet != null ? event.bullet.damage : 0f;
             }
         });
     }void setupTooltipSystem() {
@@ -278,7 +276,7 @@ public class TooltipsPlusMod extends Mod {
         
         if (build.items != null && build.block instanceof GenericCrafter) {
             GenericCrafter crafter = (GenericCrafter)build.block;
-            if (crafter.consumesItems && build.items.total() == 0) {
+            if (crafter.hasItems && build.items.total() == 0) {
                 return "No input items - Check supply chain";
             }
             if (build.items.total() >= build.block.itemCapacity * 0.95f) {
@@ -426,8 +424,8 @@ public class TooltipsPlusMod extends Mod {
                 float rotation = tb.rotation;
                 float range = turret.range * 0.8f;
                 
-                float targetX = build.x + Angles.trnsx(rotation, range);
-                float targetY = build.y + Angles.trnsy(rotation, range);
+                float targetX = build.x + arc.math.Angles.trnsx(rotation, range);
+                float targetY = build.y + arc.math.Angles.trnsy(rotation, range);
                 
                 Lines.stroke(2f);
                 Draw.color(arc.graphics.Color.red, 0.6f);
