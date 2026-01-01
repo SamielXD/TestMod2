@@ -17,6 +17,7 @@ import mindustry.mod.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import arc.util.serialization.*;
+import arc.util.io.*;
 
 public class ModInfoPlus extends Mod {
     
@@ -47,6 +48,7 @@ public class ModInfoPlus extends Mod {
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> iconCache = new ObjectMap<>();
     private ObjectMap<String, Texture> remoteIconTextures = new ObjectMap<>();
+    private ObjectSet<String> iconLoadAttempts = new ObjectSet<>();
     
     private int currentPage = 0;
     private int modsPerPage = 10;
@@ -81,7 +83,7 @@ public class ModInfoPlus extends Mod {
     private TextureRegion jsBadge;
 
     public ModInfoPlus() {
-        Log.info("ModInfo+ Browser Initializing");
+        Log.info("ModInfo+ Browser Initializing with FIXES");
         initTokens();
         loadSettings();
     }
@@ -170,6 +172,7 @@ public class ModInfoPlus extends Mod {
             .header("Authorization", "token " + getNextToken())
             .timeout(15000)
             .error(e -> {
+                Log.err("GitHub request failed: " + url, e);
                 markTokenRateLimited();
                 Core.app.post(fail);
             })
@@ -211,6 +214,7 @@ public class ModInfoPlus extends Mod {
             table.image().height(3f).width(400f).color(accentColor).pad(5f).row();
             
             table.add("[cyan]Display Settings").left().pad(8f).row();
+            table.add("[lightgray]Changes require dialog reopen").left().padLeft(20f).row();
             
             table.table(t -> {
                 t.add("UI Scale: ").left().padRight(10f);
@@ -271,9 +275,10 @@ public class ModInfoPlus extends Mod {
             
             table.image().height(2f).width(400f).color(Color.gray).pad(8f).row();
             table.add("[cyan]Badge Settings").left().pad(8f).row();
+            table.add("[lightgray]Changes require dialog reopen").left().padLeft(20f).row();
             
             table.table(t -> {
-                t.add("Badge Size: ").left().padRight(10f);
+                t.add("Badge Display Width: ").left().padRight(10f);
                 t.slider(12f, 48f, 2f, badgeSize, v -> {
                     badgeSize = v;
                     saveSettings();
@@ -366,7 +371,7 @@ public class ModInfoPlus extends Mod {
                 Vars.ui.showInfo("[lime]Settings reset to defaults");
             }).size(250f, 50f).pad(10f);
             
-            table.add("[lightgray]ModInfo+ v2.0").pad(10f);
+            table.add("[lightgray]ModInfo+ v2.1 FIXED").pad(10f);
         });
     }
     
@@ -588,6 +593,7 @@ public class ModInfoPlus extends Mod {
         remoteIndex.clear();
         filteredMods.clear();
         statsCache.clear();
+        iconLoadAttempts.clear();
         switchTab(currentTab);
     }
 
@@ -782,6 +788,7 @@ public class ModInfoPlus extends Mod {
             json -> {
                 remoteIndex = parseRemoteIndex(json);
                 matchInstalledMods();
+                detectRemoteCapabilities();
                 loadRemoteIcons();
                 applyFilter();
                 updateVisibleMods();
@@ -808,13 +815,64 @@ public class ModInfoPlus extends Mod {
         }
     }
 
+    void detectRemoteCapabilities() {
+        for(ModInfo mod : remoteIndex) {
+            if(mod.repo.isEmpty()) continue;
+            
+            String key = "detect_" + mod.repo;
+            if(iconLoadAttempts.contains(key)) continue;
+            iconLoadAttempts.add(key);
+            
+            githubGet(
+                "https://api.github.com/repos/" + mod.repo + "/contents",
+                json -> parseModContents(mod, json),
+                () -> {}
+            );
+        }
+    }
+
+    void parseModContents(ModInfo mod, String json) {
+        try {
+            JsonValue contents = new JsonReader().parse(json);
+            
+            mod.hasJava = false;
+            mod.hasScripts = false;
+            mod.hasHjson = false;
+            
+            for(JsonValue item : contents) {
+                String name = item.getString("name", "");
+                String type = item.getString("type", "");
+                
+                if(type.equals("dir")) {
+                    if(name.equals("src")) mod.hasJava = true;
+                    if(name.equals("scripts")) mod.hasScripts = true;
+                    if(name.equals("content")) mod.touchesContent = true;
+                }
+                
+                if(type.equals("file")) {
+                    if(name.equals("mod.hjson")) mod.hasHjson = true;
+                }
+            }
+            
+            mod.clientOnly = !mod.touchesContent && (mod.hasScripts || mod.touchesUI);
+            mod.serverCompatible = !mod.clientOnly;
+            
+            Core.app.post(this::updateVisibleMods);
+            
+        } catch(Exception e) {
+            Log.err("Parse contents", e);
+        }
+    }
+
     void loadRemoteIcons() {
         for(ModInfo mod : remoteIndex) {
             if(mod.repo.isEmpty()) continue;
             String key = mod.name.toLowerCase();
             if(iconCache.containsKey(key)) continue;
+            if(iconLoadAttempts.contains(key)) continue;
             
-            loadIconFromGitHub(mod, "main", "icon.png");
+            iconLoadAttempts.add(key);
+            loadIconFromGitHub(mod, "master", "icon.png");
         }
     }
 
@@ -822,12 +880,12 @@ public class ModInfoPlus extends Mod {
         String iconUrl = "https://raw.githubusercontent.com/" + mod.repo + "/" + branch + "/" + filename;
         
         Http.get(iconUrl)
-            .timeout(5000)
+            .timeout(8000)
             .error(e -> {
-                if(branch.equals("main") && filename.equals("icon.png")) {
-                    loadIconFromGitHub(mod, "master", "icon.png");
-                } else if(branch.equals("master") && filename.equals("icon.png")) {
-                    loadIconFromGitHub(mod, branch, "icon.jpg");
+                if(branch.equals("master") && filename.equals("icon.png")) {
+                    Core.app.post(() -> loadIconFromGitHub(mod, "main", "icon.png"));
+                } else if(branch.equals("main") && filename.equals("icon.png")) {
+                    Core.app.post(() -> loadIconFromGitHub(mod, branch, "icon.jpg"));
                 }
             })
             .submit(res -> {
@@ -843,7 +901,9 @@ public class ModInfoPlus extends Mod {
                         remoteIconTextures.put(key, tex);
                         updateVisibleMods();
                     });
-                } catch(Exception e) {}
+                } catch(Exception e) {
+                    Log.err("Icon load failed for " + mod.name, e);
+                }
             });
     }
 
@@ -860,13 +920,6 @@ public class ModInfoPlus extends Mod {
                 mod.version = modJson.getString("minGameVersion", "?");
                 mod.lastUpdated = modJson.getString("lastUpdated", "");
                 mod.stars = modJson.getInt("stars", 0);
-                
-                mod.hasJava = modJson.getBoolean("hasJava", false);
-                mod.hasScripts = modJson.getBoolean("hasScripts", false);
-                
-                boolean clientSideFlag = modJson.getBoolean("clientSide", false);
-                mod.clientOnly = clientSideFlag || (mod.hasScripts && !mod.hasJava);
-                mod.serverCompatible = !mod.clientOnly;
                 
                 mod.isVerified = mod.stars >= verifiedStarThreshold;
                 
