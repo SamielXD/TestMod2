@@ -95,7 +95,7 @@ public class TooltipsPlusMod extends Mod {
             try {
                 if (Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
                     var blockInfo = Vars.ui.hudfrag.blockfrag;
-                    blockInfo.setVisible(false);
+                    blockInfo.visible(false);
                 }
             } catch (Exception e) {
             }
