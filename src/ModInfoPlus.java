@@ -8,6 +8,7 @@ import arc.scene.ui.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
+import arc.util.serialization.*;
 import mindustry.*;
 import mindustry.game.EventType.*;
 import mindustry.gen.*;
@@ -48,16 +49,10 @@ public class ModInfoPlus extends Mod {
         badgeSize = Core.settings.getFloat("modinfo-badgesize", 16f);
     }
     
-    void saveSettings() {
+    public void saveSettings() {
         Core.settings.put("modinfo-uiscale", uiScale);
         Core.settings.put("modinfo-iconsize", iconSize);
         Core.settings.put("modinfo-badgesize", badgeSize);
-    }
-    
-    public void registerClientCommands(CommandHandler handler) {
-        handler.<Player>register("modinfo", "Open enhanced mod browser", (args, player) -> {
-            Call.infoMessage("Use the Enhanced Browser button in the mods menu");
-        });
     }
 }
 
@@ -138,8 +133,8 @@ class ModInfoCache {
         
         Http.get("https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json", response -> {
             try {
-                Jval json = Jval.read(response.getResultAsString());
-                for(Jval modData : json.asArray()) {
+                JsonValue json = new JsonReader().parse(response.getResultAsString());
+                for(JsonValue modData : json) {
                     String name = modData.getString("name", "");
                     String displayName = modData.getString("displayName", name);
                     String author = modData.getString("author", "");
@@ -249,7 +244,9 @@ class IconManager {
             iconCache.put(mod.name, defaultIcon);
         });
     }
-}class BadgeSystem {
+}
+
+class BadgeSystem {
     
     static class Badge {
         String text;
@@ -312,12 +309,12 @@ class IconManager {
             badgeTable.addListener(new ClickListener() {
                 public void enter(InputEvent event, float x, float y, int pointer, Element fromActor) {
                     badgeTable.setBackground(Tex.buttonOver);
-                    badgeTable.getColor().set(badge.color).a(0.8f);
+                    badgeTable.color.set(badge.color).a(0.8f);
                 }
                 
                 public void exit(InputEvent event, float x, float y, int pointer, Element toActor) {
                     badgeTable.setBackground(Tex.button);
-                    badgeTable.getColor().set(Color.white);
+                    badgeTable.color.set(Color.white);
                 }
             });
             
@@ -446,9 +443,7 @@ class ModBrowserDialog extends BaseDialog {
             buildModRow(onlineTable, mod);
             onlineTable.row();
         }
-    }
-    
-    void buildModRow(Table parent, ModInfo mod) {
+    }void buildModRow(Table parent, ModInfo mod) {
         mod.hasUpdate = ModInfoPlus.cache.hasUpdate(mod);
         
         Table row = new Table(Tex.button);
@@ -542,15 +537,19 @@ class ModBrowserDialog extends BaseDialog {
         settings.cont.add("Changes require game restart").color(Color.coral).row();
         
         settings.buttons.button("Save", () -> {
-            ModInfoPlus mod = (ModInfoPlus) mods.getMod(ModInfoPlus.class);
-            mod.saveSettings();
+            Mods.LoadedMod loadedMod = mods.getMod(ModInfoPlus.class);
+            if(loadedMod != null && loadedMod.main instanceof ModInfoPlus) {
+                ((ModInfoPlus)loadedMod.main).saveSettings();
+            }
             settings.hide();
         });
         
         settings.addCloseButton();
         settings.show();
     }
-}class ModRowBuilder {
+}
+
+class ModRowBuilder {
     
     static Table buildCompactRow(ModInfo mod) {
         Table row = new Table(Tex.button);
@@ -739,19 +738,23 @@ class ModSorter {
     void sort(Seq<ModInfo> mods) {
         switch(currentMode) {
             case NAME:
-                mods.sort(m -> m.displayName);
+                mods.sort((a, b) -> a.displayName.compareTo(b.displayName));
                 break;
             case AUTHOR:
-                mods.sort(m -> m.author != null ? m.author : "");
+                mods.sort((a, b) -> {
+                    String authorA = a.author != null ? a.author : "";
+                    String authorB = b.author != null ? b.author : "";
+                    return authorA.compareTo(authorB);
+                });
                 break;
             case STARS:
-                mods.sort(m -> -m.stars);
+                mods.sort((a, b) -> Integer.compare(b.stars, a.stars));
                 break;
             case RECENT:
-                mods.sort(m -> -m.lastUpdated);
+                mods.sort((a, b) -> Long.compare(b.lastUpdated, a.lastUpdated));
                 break;
             case ENABLED:
-                mods.sort(m -> m.isEnabled ? 0 : 1);
+                mods.sort((a, b) -> Boolean.compare(b.isEnabled, a.isEnabled));
                 break;
         }
         
@@ -796,7 +799,7 @@ class UpdateChecker {
         
         Http.get(apiUrl, response -> {
             try {
-                Jval json = Jval.read(response.getResultAsString());
+                JsonValue json = new JsonReader().parse(response.getResultAsString());
                 String latestVersion = json.getString("tag_name", "").replace("v", "");
                 
                 if(!latestVersion.isEmpty() && mod.version != null) {
