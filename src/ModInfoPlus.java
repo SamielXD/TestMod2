@@ -826,7 +826,12 @@ public class ModInfoPlus extends Mod {
         filterMode = "all";
         if(searchField != null) searchField.setText("");
         buildHeader();
-        applyFilter();
+        
+        if(tab == 0 || tab == 1) {
+            buildOfflineModList();
+        } else {
+            buildUnifiedModList();
+        }
     }
     
     void reloadMods() {
@@ -985,7 +990,8 @@ public class ModInfoPlus extends Mod {
                 nameLabel.setStyle(Styles.outlineLabel);
                 nameLabel.setColor(Color.white);
                 nameLabel.setWrap(true);
-                info.add(nameLabel).growX().padBottom(2f).row();
+                nameLabel.setEllipsis(true);
+                info.add(nameLabel).width(300f * uiScale).padBottom(2f).row();
                 
                 Table metaRow = new Table();
                 metaRow.left();
@@ -1007,7 +1013,7 @@ public class ModInfoPlus extends Mod {
                 
                 info.add(metaRow).left();
                 
-            }).growX().pad(10f);
+            }).width(300f * uiScale).pad(10f);
             
             row.button(Icon.rightOpen, Styles.cleari, () -> {
                 showModDetails(mod);
