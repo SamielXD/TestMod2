@@ -1,232 +1,334 @@
 package tooltipsplus;
 
-import arc.*;
-import arc.graphics.*;
-import arc.util.*;
-import mindustry.*;
-import mindustry.mod.*;
-import mindustry.type.*;
-import mindustry.world.*;
-import mindustry.world.blocks.power.*;
-import mindustry.world.meta.*;
-import mindustry.game.EventType.*;
+import arc.util.Log;
+import arc.util.Strings;
+import arc.util.Timer;
+import mindustry.Events;
+import mindustry.Vars;
+import mindustry.game.EventType.ClientLoadEvent;
+import mindustry.game.EventType.WorldLoadEvent;
+import mindustry.mod.Mod;
+import mindustry.type.Item;
+import mindustry.type.UnitType;
+import mindustry.type.Liquid;
+import mindustry.ui.Styles;
+import mindustry.ui.Styles.Icon;
+import mindustry.ui.Icons;
+import mindustry.ui.dialogs.BaseDialog;
+import mindustry.world.Block;
+import mindustry.world.blocks.power.PowerGenerator;
+import mindustry.world.meta.Stat;
+import mindustry.world.meta.StatUnit;
 
-public class TooltipsPlusMod extends Mod{
+/**
+ * TooltipsPlusMod
+ * - Adds extra stats to tooltips for blocks, units, items, liquids.
+ * - Provides a simple Settings page in Options -> Tooltips+
+ *
+ * Notes:
+ * - Avoids non-existent API members (stats.initialized, stats.has(...), Stat.hardness, etc).
+ * - Uses Stat.input for custom textual entries when needed.
+ */
+public class TooltipsPlusMod extends Mod {
 
-    // --------------------
-    // SETTINGS VALUES
-    // --------------------
-    boolean enabled;
-    boolean blocks;
-    boolean units;
-    boolean items;
-    boolean liquids;
-    boolean showToast;
-    boolean debug;
+    boolean enabled = true;
+    boolean showTemperature = true;
+    boolean showItemFlags = true;
+    boolean debug = false;
 
-    // --------------------
-    // SETTINGS KEYS
-    // --------------------
-    static final String K_ENABLED = "tp-enabled";
-    static final String K_BLOCKS = "tp-blocks";
-    static final String K_UNITS = "tp-units";
-    static final String K_ITEMS = "tp-items";
-    static final String K_LIQUIDS = "tp-liquids";
-    static final String K_TOAST = "tp-toast";
-    static final String K_DEBUG = "tp-debug";
+    @Override
+    public void init() {
+        Log.info("Tooltips+ initializing...");
+        loadSettings();
 
-    public TooltipsPlusMod(){
+        // run on client load to ensure UI is available
         Events.on(ClientLoadEvent.class, e -> {
-            loadSettings();
-
-            if(enabled){
-                injectAll();
-            }
-
-            Core.app.post(this::addSettingsUI);
-
-            if(showToast){
-                Vars.ui.showInfoToast("[lime]Tooltips+ loaded", 2f);
+            try {
+                // Post to main app thread for UI / content access
+                Vars.ui.getStage().post(() -> {
+                    try {
+                        injectTooltips();
+                    } catch (Throwable t) {
+                        Log.err("Tooltips+: injectTooltips failed", t);
+                    }
+                    try {
+                        addSettings();
+                    } catch (Throwable t) {
+                        Log.err("Tooltips+: addSettings failed", t);
+                    }
+                });
+            } catch (Throwable t) {
+                Log.err("Tooltips+: clientload handler failed", t);
             }
         });
+
+        // optional: save logs on world load (similar to your JS snippet)
+        Events.on(WorldLoadEvent.class, e -> {
+            if (enabled) {
+                // example action: schedule a small confirmation toast
+                Timer.schedule(() -> Vars.ui.showInfoToast("[lime]Tooltips+ active", 1.5f), 0.5f);
+            }
+        });
+
+        Log.info("Tooltips+ initialized");
     }
 
-    // --------------------
-    // LOAD / SAVE SETTINGS
-    // --------------------
-    void loadSettings(){
-        enabled  = Core.settings.getBool(K_ENABLED, true);
-        blocks   = Core.settings.getBool(K_BLOCKS, true);
-        units    = Core.settings.getBool(K_UNITS, true);
-        items    = Core.settings.getBool(K_ITEMS, true);
-        liquids  = Core.settings.getBool(K_LIQUIDS, true);
-        showToast= Core.settings.getBool(K_TOAST, true);
-        debug    = Core.settings.getBool(K_DEBUG, false);
+    void loadSettings() {
+        enabled = Core.settings.getBool("tooltipsplus-enabled", true);
+        showTemperature = Core.settings.getBool("tooltipsplus-temp", true);
+        showItemFlags = Core.settings.getBool("tooltipsplus-itemflags", true);
+        debug = Core.settings.getBool("tooltipsplus-debug", false);
     }
 
-    void save(){
-        Core.settings.put(K_ENABLED, enabled);
-        Core.settings.put(K_BLOCKS, blocks);
-        Core.settings.put(K_UNITS, units);
-        Core.settings.put(K_ITEMS, items);
-        Core.settings.put(K_LIQUIDS, liquids);
-        Core.settings.put(K_TOAST, showToast);
-        Core.settings.put(K_DEBUG, debug);
+    void saveSettings() {
+        Core.settings.put("tooltipsplus-enabled", enabled);
+        Core.settings.put("tooltipsplus-temp", showTemperature);
+        Core.settings.put("tooltipsplus-itemflags", showItemFlags);
+        Core.settings.put("tooltipsplus-debug", debug);
         Core.settings.forceSave();
     }
 
-    // --------------------
-    // INJECT TOOLTIP DATA
-    // --------------------
-    void injectAll(){
-        if(blocks)  Vars.content.blocks().each(this::enhanceBlock);
-        if(units)   Vars.content.units().each(this::enhanceUnit);
-        if(items)   Vars.content.items().each(this::enhanceItem);
-        if(liquids) Vars.content.liquids().each(this::enhanceLiquid);
-
-        if(debug) Log.info("Tooltips+ injected");
-    }
-
-    // --------------------
-    // BLOCKS
-    // --------------------
-    void enhanceBlock(Block b){
-        if(!b.stats.initialized) return;
-
-        if(!b.stats.has(Stat.health) && b.health > 0){
-            b.stats.add(Stat.health, b.health);
+    void injectTooltips() {
+        if (!enabled) {
+            if (debug) Log.info("Tooltips+ disabled by settings, skipping injection.");
+            return;
         }
 
-        if(b.hasItems && !b.stats.has(Stat.itemCapacity)){
-            b.stats.add(Stat.itemCapacity, b.itemCapacity);
-        }
+        int blocks = 0, units = 0, items = 0, liquids = 0;
 
-        if(b.hasLiquids && !b.stats.has(Stat.liquidCapacity)){
-            b.stats.add(Stat.liquidCapacity, b.liquidCapacity, StatUnit.liquidUnits);
-        }
-
-        if(b instanceof PowerGenerator g && g.powerProduction > 0){
-            if(!b.stats.has(Stat.basePowerGeneration)){
-                b.stats.add(Stat.basePowerGeneration, g.powerProduction * 60f, StatUnit.powerSecond);
+        // Blocks
+        for (Block b : Vars.content.blocks()) {
+            try {
+                if (enhanceBlock(b)) blocks++;
+            } catch (Throwable t) {
+                if (debug) Log.err("Tooltips+: error enhancing block @", b.name, t);
             }
         }
 
-        if(!b.stats.has(Stat.size)){
-            b.stats.add(Stat.size, b.size + "x" + b.size);
+        // Units
+        for (UnitType u : Vars.content.units()) {
+            try {
+                if (enhanceUnit(u)) units++;
+            } catch (Throwable t) {
+                if (debug) Log.err("Tooltips+: error enhancing unit @", u.name, t);
+            }
         }
+
+        // Items
+        for (Item i : Vars.content.items()) {
+            try {
+                if (enhanceItem(i)) items++;
+            } catch (Throwable t) {
+                if (debug) Log.err("Tooltips+: error enhancing item @", i.name, t);
+            }
+        }
+
+        // Liquids
+        for (Liquid l : Vars.content.liquids()) {
+            try {
+                if (enhanceLiquid(l)) liquids++;
+            } catch (Throwable t) {
+                if (debug) Log.err("Tooltips+: error enhancing liquid @", l.name, t);
+            }
+        }
+
+        Log.info("Tooltips+ enhanced: @ blocks, @ units, @ items, @ liquids", blocks, units, items, liquids);
     }
 
-    // --------------------
-    // UNITS
-    // --------------------
-    void enhanceUnit(UnitType u){
-        if(!u.stats.initialized) return;
+    boolean enhanceBlock(Block block) {
+        boolean changed = false;
+        try {
+            // health
+            if (block.health > 0) {
+                block.stats.add(Stat.health, (int) block.health);
+                if (debug) Log.info("Tooltips+: added health to @ = @", block.name, (int) block.health);
+                changed = true;
+            }
 
-        if(!u.stats.has(Stat.health)){
-            u.stats.add(Stat.health, u.health);
-        }
+            // item capacity
+            if (block.hasItems() && block.itemCapacity > 0) {
+                block.stats.add(Stat.itemCapacity, (int) block.itemCapacity);
+                if (debug) Log.info("Tooltips+: added itemCapacity to @ = @", block.name, block.itemCapacity);
+                changed = true;
+            }
 
-        if(!u.stats.has(Stat.speed)){
-            u.stats.add(Stat.speed, u.speed, StatUnit.tilesSecond);
-        }
+            // liquid capacity
+            if (block.hasLiquids() && block.liquidCapacity > 0) {
+                block.stats.add(Stat.liquidCapacity, block.liquidCapacity, StatUnit.liquidUnits);
+                if (debug) Log.info("Tooltips+: added liquidCapacity to @ = @", block.name, Strings.autoFixed(block.liquidCapacity, 1));
+                changed = true;
+            }
 
-        if(!u.stats.has(Stat.armor)){
-            u.stats.add(Stat.armor, u.armor);
-        }
+            // power generator
+            if (block instanceof PowerGenerator gen && gen.powerProduction > 0f) {
+                float perSec = gen.powerProduction * 60f;
+                block.stats.add(Stat.basePowerGeneration, perSec, StatUnit.powerSecond);
+                if (debug) Log.info("Tooltips+: added power to @ = @/s", block.name, Strings.autoFixed(perSec, 1));
+                changed = true;
+            }
 
-        if(u.flying && !u.stats.has(Stat.flying)){
-            u.stats.add(Stat.flying, "[accent]Yes");
-        }
+            // size (present as custom text so we don't rely on internal Stat typing)
+            if (block.size > 1) {
+                block.stats.add(Stat.input, "[lightgray]Size:[] " + block.size + "x" + block.size);
+                if (debug) Log.info("Tooltips+: added size to @ = @x@", block.name, block.size, block.size);
+                changed = true;
+            }
 
-        if(u.mineSpeed > 0 && !u.stats.has(Stat.mineSpeed)){
-            u.stats.add(Stat.mineSpeed, u.mineSpeed, StatUnit.perSecond);
-        }
+            // approximate cost
+            if (block.requirements != null && block.requirements.length > 0) {
+                int total = 0;
+                for (var req : block.requirements) total += req.amount;
+                if (total > 50) {
+                    block.stats.add(Stat.buildCost, total);
+                    if (debug) Log.info("Tooltips+: added buildCost to @ = @", block.name, total);
+                    changed = true;
+                }
+            }
 
-        if(u.buildSpeed > 0 && !u.stats.has(Stat.buildSpeed)){
-            u.stats.add(Stat.buildSpeed, u.buildSpeed);
+        } catch (Throwable t) {
+            if (debug) Log.err("Tooltips+: exception while enhancing block @", block.name, t);
+            return false;
         }
+        return changed;
     }
 
-    // --------------------
-    // ITEMS
-    // --------------------
-    void enhanceItem(Item i){
-        if(!i.stats.initialized) return;
+    boolean enhanceUnit(UnitType unit) {
+        boolean changed = false;
+        try {
+            // health
+            unit.stats.add(Stat.health, (int) unit.health);
+            if (debug) Log.info("Tooltips+: unit health @ = @", unit.name, (int) unit.health);
+            changed = true;
 
-        if(i.hardness > 0 && !i.stats.has(Stat.hardness)){
-            i.stats.add(Stat.hardness, i.hardness);
-        }
+            // speed
+            unit.stats.add(Stat.speed, unit.speed, StatUnit.tilesSecond);
+            if (debug) Log.info("Tooltips+: unit speed @ = @", unit.name, Strings.autoFixed(unit.speed, 2));
+            changed = true;
 
-        if(i.flammability > 0 && !i.stats.has(Stat.flammability)){
-            i.stats.add(Stat.flammability, i.flammability);
-        }
+            // armor
+            unit.stats.add(Stat.armor, (int) unit.armor);
+            if (debug) Log.info("Tooltips+: unit armor @ = @", unit.name, (int) unit.armor);
+            changed = true;
 
-        if(i.explosiveness > 0 && !i.stats.has(Stat.explosiveness)){
-            i.stats.add(Stat.explosiveness, i.explosiveness);
-        }
+            // flying / special
+            if (unit.flying) {
+                unit.stats.add(Stat.input, "[accent]Flying[]");
+                changed = true;
+            }
 
-        if(i.radioactivity > 0 && !i.stats.has(Stat.radioactivity)){
-            i.stats.add(Stat.radioactivity, i.radioactivity);
+            if (unit.mineSpeed > 0) {
+                unit.stats.add(Stat.mineSpeed, unit.mineSpeed, StatUnit.perSecond);
+                changed = true;
+            }
+
+            if (unit.buildSpeed > 0) {
+                unit.stats.add(Stat.buildSpeed, unit.buildSpeed);
+                changed = true;
+            }
+
+        } catch (Throwable t) {
+            if (debug) Log.err("Tooltips+: exception while enhancing unit @", unit.name, t);
+            return false;
         }
+        return changed;
     }
 
-    // --------------------
-    // LIQUIDS
-    // --------------------
-    void enhanceLiquid(Liquid l){
-        if(!l.stats.initialized) return;
+    boolean enhanceItem(Item item) {
+        boolean changed = false;
+        try {
+            if (item.hardness > 0 && showItemFlags) {
+                // custom textual line via Stat.input (safe across versions)
+                item.stats.add(Stat.input, "[lightgray]Hardness:[] " + Strings.autoFixed(item.hardness, 1));
+                changed = true;
+            }
 
-        if(!l.stats.has(Stat.temperature)){
-            l.stats.add(Stat.temperature, l.temperature);
-        }
+            if (item.flammability > 0.1f && showItemFlags) {
+                // flammability numeric stat (some versions support Stat.flammability, but using input keeps compatibility)
+                item.stats.add(Stat.input, "[orange]Flammable[] " + Strings.autoFixed(item.flammability, 2));
+                changed = true;
+            }
 
-        if(l.flammability > 0 && !l.stats.has(Stat.flammability)){
-            l.stats.add(Stat.flammability, l.flammability);
-        }
+            if (item.explosiveness > 0.1f && showItemFlags) {
+                item.stats.add(Stat.input, "[scarlet]Explosive[] " + Strings.autoFixed(item.explosiveness, 2));
+                changed = true;
+            }
 
-        if(l.explosiveness > 0 && !l.stats.has(Stat.explosiveness)){
-            l.stats.add(Stat.explosiveness, l.explosiveness);
+            if (item.radioactivity > 0.1f && showItemFlags) {
+                item.stats.add(Stat.input, "[green]Radioactive[] " + Strings.autoFixed(item.radioactivity, 2));
+                changed = true;
+            }
+        } catch (Throwable t) {
+            if (debug) Log.err("Tooltips+: exception while enhancing item @", item.name, t);
+            return false;
         }
+        return changed;
     }
 
-    // --------------------
-    // SETTINGS UI
-    // --------------------
-    void addSettingsUI(){
-        Vars.ui.settings.addCategory("Tooltips+", Icon.book, t -> {
+    boolean enhanceLiquid(Liquid liquid) {
+        boolean changed = false;
+        try {
+            if (showTemperature) {
+                liquid.stats.add(Stat.input, "[lightgray]Temp:[] " + Strings.autoFixed(liquid.temperature, 2));
+                changed = true;
+            }
 
-            t.add("[accent]Tooltips+").pad(10).row();
-            t.image().color(Color.gray).height(2).width(400).pad(5).row();
+            if (liquid.flammability > 0.1f) {
+                liquid.stats.add(Stat.input, "[orange]Flammable[] " + Strings.autoFixed(liquid.flammability, 2));
+                changed = true;
+            }
 
-            t.checkPref(K_ENABLED, enabled, v -> {
-                enabled = v;
-                save();
+            if (liquid.explosiveness > 0.1f) {
+                liquid.stats.add(Stat.input, "[scarlet]Explosive[] " + Strings.autoFixed(liquid.explosiveness, 2));
+                changed = true;
+            }
+        } catch (Throwable t) {
+            if (debug) Log.err("Tooltips+: exception while enhancing liquid @", liquid.name, t);
+            return false;
+        }
+        return changed;
+    }
+
+    /** Add a settings category similar to your JS snippet. */
+    void addSettings() {
+        // mindustry.ui.Icon is available in many builds; if your environment differs swap with Core.atlas.find("icon-...").
+        Vars.ui.settings.addCategory("Tooltips+", Icons.book, table -> {
+            table.add("[accent]Tooltips+ Settings").pad(8f).row();
+
+            table.checkPref("tooltipsplus-enabled", enabled, val -> {
+                enabled = val;
+                saveSettings();
+                // re-inject if needed
+                if (enabled) injectTooltips();
             }).row();
 
-            t.add("[lightgray]Content").padTop(6).row();
+            table.checkPref("tooltipsplus-temp", showTemperature, val -> {
+                showTemperature = val;
+                saveSettings();
+            }).row();
 
-            t.checkPref(K_BLOCKS, blocks, v -> { blocks = v; save(); }).row();
-            t.checkPref(K_UNITS, units, v -> { units = v; save(); }).row();
-            t.checkPref(K_ITEMS, items, v -> { items = v; save(); }).row();
-            t.checkPref(K_LIQUIDS, liquids, v -> { liquids = v; save(); }).row();
+            table.checkPref("tooltipsplus-itemflags", showItemFlags, val -> {
+                showItemFlags = val;
+                saveSettings();
+            }).row();
 
-            t.image().color(Color.gray).height(2).width(400).pad(6).row();
+            table.checkPref("tooltipsplus-debug", debug, val -> {
+                debug = val;
+                saveSettings();
+            }).row();
 
-            t.checkPref(K_TOAST, showToast, v -> { showToast = v; save(); }).row();
-            t.checkPref(K_DEBUG, debug, v -> { debug = v; save(); }).row();
+            table.image().height(2f).width(400f).color(Styles.outlineColor).pad(8f).row();
 
-            t.image().color(Color.gray).height(2).width(400).pad(6).row();
+            table.button("Re-run tooltip injection", () -> {
+                injectTooltips();
+                Vars.ui.showInfoToast("[lime]Tooltips re-injected", 1.5f);
+            }).size(260f, 50f).pad(6f).row();
 
-            t.button("[cyan]Re-apply tooltips", () -> {
-                if(enabled){
-                    injectAll();
-                    Vars.ui.showInfoToast("[lime]Tooltips updated", 2f);
-                }else{
-                    Vars.ui.showInfoToast("[scarlet]Tooltips+ disabled", 2f);
-                }
-            }).size(280, 55).pad(6).row();
-
-            t.add("[gray]Restart required to remove injected stats").padTop(6).row();
+            table.button("Open Tooltips+ info", () -> {
+                BaseDialog d = new BaseDialog("Tooltips+");
+                d.cont.add("Adds extra fields to tooltips (health, capacity, power, etc.).").pad(6f);
+                d.addCloseButton();
+                d.show();
+            }).size(260f, 50f).pad(6f).row();
         });
     }
 }
