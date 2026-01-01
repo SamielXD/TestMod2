@@ -1,6 +1,7 @@
 package tooltipsplus;
 
 import arc.*;
+import arc.func.Cons;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
@@ -16,53 +17,78 @@ import mindustry.world.*;
 import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.blocks.defense.*;
+import mindustry.gen.*;
 
 public class TooltipsPlusMod extends Mod {
     
     public TooltipsPlusMod() {
+        Log.info("ToolTips+ loading...");
+        
         Events.on(ClientLoadEvent.class, e -> {
-            setupTooltips();
+            Log.info("ToolTips+ applying enhancements...");
+            Core.app.post(() -> {
+                setupTooltips();
+                Log.info("ToolTips+ loaded successfully!");
+            });
         });
     }
     
     void setupTooltips() {
         Vars.content.blocks().each(block -> {
-            enhanceBlockTooltip(block);
+            try {
+                enhanceBlockTooltip(block);
+            } catch(Exception e) {
+                Log.err("Failed to enhance block: " + block.name, e);
+            }
         });
         
         Vars.content.units().each(unit -> {
-            enhanceUnitTooltip(unit);
+            try {
+                enhanceUnitTooltip(unit);
+            } catch(Exception e) {
+                Log.err("Failed to enhance unit: " + unit.name, e);
+            }
         });
         
         Vars.content.items().each(item -> {
-            enhanceItemTooltip(item);
+            try {
+                enhanceItemTooltip(item);
+            } catch(Exception e) {
+                Log.err("Failed to enhance item: " + item.name, e);
+            }
         });
         
         Vars.content.liquids().each(liquid -> {
-            enhanceLiquidTooltip(liquid);
+            try {
+                enhanceLiquidTooltip(liquid);
+            } catch(Exception e) {
+                Log.err("Failed to enhance liquid: " + liquid.name, e);
+            }
         });
     }
     
     void enhanceBlockTooltip(Block block) {
         if(block.description == null) block.description = "";
-        String original = block.description;
-        StringBuilder enhanced = new StringBuilder(original);
         
-        enhanced.append("\n\n[lightgray]");
-        enhanced.append("Health: ").append((int)block.health);
+        StringBuilder enhanced = new StringBuilder();
+        enhanced.append(block.description);
+        
+        if(enhanced.length() > 0) {
+            enhanced.append("\n");
+        }
+        
+        enhanced.append("\n[stat]Health:[] ").append((int)block.health);
         
         if(block.hasItems && block.itemCapacity > 0) {
-            enhanced.append("\nItem capacity: ").append(block.itemCapacity);
+            enhanced.append("\n[stat]Items:[] ").append(block.itemCapacity);
         }
         
         if(block.hasLiquids && block.liquidCapacity > 0) {
-            enhanced.append("\nLiquid capacity: ").append((int)block.liquidCapacity);
+            enhanced.append("\n[stat]Liquids:[] ").append((int)block.liquidCapacity);
         }
         
-        if(block.hasPower) {
-            if(block instanceof PowerGenerator gen) {
-                enhanced.append("\nPower: +").append(Strings.autoFixed(gen.powerProduction * 60f, 2)).append("/s");
-            }
+        if(block.hasPower && block instanceof PowerGenerator gen) {
+            enhanced.append("\n[stat]Power:[] +").append(Strings.autoFixed(gen.powerProduction * 60f, 1)).append("/s");
         }
         
         if(block.requirements != null && block.requirements.length > 0) {
@@ -70,98 +96,106 @@ public class TooltipsPlusMod extends Mod {
             for(int i = 0; i < block.requirements.length; i++) {
                 totalCost += block.requirements[i].amount;
             }
-            if(totalCost > 100) {
-                enhanced.append("\nBuild cost: ").append(totalCost).append(" items");
+            if(totalCost > 50) {
+                enhanced.append("\n[stat]Cost:[] ").append(totalCost);
             }
         }
         
         if(block.size > 1) {
-            enhanced.append("\nSize: ").append(block.size).append("x").append(block.size);
+            enhanced.append("\n[stat]Size:[] ").append(block.size).append("x").append(block.size);
         }
         
-        enhanced.append("[]");
         block.description = enhanced.toString();
+        block.details = enhanced.toString();
     }
     
     void enhanceUnitTooltip(UnitType unit) {
         if(unit.description == null) unit.description = "";
-        String original = unit.description;
-        StringBuilder enhanced = new StringBuilder(original);
         
-        enhanced.append("\n\n[lightgray]");
-        enhanced.append("Health: ").append((int)unit.health);
-        enhanced.append("\nSpeed: ").append(Strings.autoFixed(unit.speed * 60f / 8f, 1)).append(" tiles/s");
-        enhanced.append("\nArmor: ").append((int)unit.armor);
+        StringBuilder enhanced = new StringBuilder();
+        enhanced.append(unit.description);
+        
+        if(enhanced.length() > 0) {
+            enhanced.append("\n");
+        }
+        
+        enhanced.append("\n[stat]Health:[] ").append((int)unit.health);
+        enhanced.append("\n[stat]Speed:[] ").append(Strings.autoFixed(unit.speed, 1));
+        enhanced.append("\n[stat]Armor:[] ").append((int)unit.armor);
         
         if(unit.flying) {
-            enhanced.append("\nType: Flying");
+            enhanced.append("\n[accent]Flying[]");
         } else if(unit.naval) {
-            enhanced.append("\nType: Naval");
-        } else {
-            enhanced.append("\nType: Ground");
+            enhanced.append("\n[accent]Naval[]");
         }
         
         if(unit.mineSpeed > 0) {
-            enhanced.append("\nCan mine");
+            enhanced.append("\n[accent]Can mine[]");
         }
         
         if(unit.buildSpeed > 0) {
-            enhanced.append("\nCan build");
+            enhanced.append("\n[accent]Can build[]");
         }
         
-        enhanced.append("[]");
         unit.description = enhanced.toString();
+        unit.details = enhanced.toString();
     }
     
     void enhanceItemTooltip(Item item) {
         if(item.description == null) item.description = "";
-        String original = item.description;
-        StringBuilder enhanced = new StringBuilder(original);
         
-        enhanced.append("\n\n[lightgray]");
+        StringBuilder enhanced = new StringBuilder();
+        enhanced.append(item.description);
+        
+        if(enhanced.length() > 0) {
+            enhanced.append("\n");
+        }
         
         if(item.hardness > 0) {
-            enhanced.append("Hardness: ").append(item.hardness);
+            enhanced.append("\n[stat]Hardness:[] ").append(item.hardness);
         }
         
         if(item.flammability > 0.1f) {
-            enhanced.append("\n[orange]Flammable");
+            enhanced.append("\n[orange]Flammable[]");
         }
         
         if(item.explosiveness > 0.1f) {
-            enhanced.append("\n[scarlet]Explosive");
+            enhanced.append("\n[scarlet]Explosive[]");
         }
         
         if(item.radioactivity > 0.1f) {
-            enhanced.append("\n[green]Radioactive");
+            enhanced.append("\n[green]Radioactive[]");
         }
         
-        enhanced.append("[]");
         item.description = enhanced.toString();
+        item.details = enhanced.toString();
     }
     
     void enhanceLiquidTooltip(Liquid liquid) {
         if(liquid.description == null) liquid.description = "";
-        String original = liquid.description;
-        StringBuilder enhanced = new StringBuilder(original);
         
-        enhanced.append("\n\n[lightgray]");
+        StringBuilder enhanced = new StringBuilder();
+        enhanced.append(liquid.description);
+        
+        if(enhanced.length() > 0) {
+            enhanced.append("\n");
+        }
         
         if(liquid.temperature > 0.7f) {
-            enhanced.append("Temperature: Hot");
+            enhanced.append("\n[orange]Hot[]");
         } else if(liquid.temperature < 0.3f) {
-            enhanced.append("Temperature: Cold");
+            enhanced.append("\n[cyan]Cold[]");
         }
         
         if(liquid.flammability > 0.1f) {
-            enhanced.append("\n[orange]Flammable");
+            enhanced.append("\n[orange]Flammable[]");
         }
         
         if(liquid.explosiveness > 0.1f) {
-            enhanced.append("\n[scarlet]Explosive");
+            enhanced.append("\n[scarlet]Explosive[]");
         }
         
-        enhanced.append("[]");
         liquid.description = enhanced.toString();
+        liquid.details = enhanced.toString();
     }
 }
