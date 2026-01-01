@@ -17,7 +17,6 @@ import mindustry.mod.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import arc.util.serialization.*;
-import arc.util.io.*;
 
 public class ModInfoPlus extends Mod {
     
@@ -43,12 +42,12 @@ public class ModInfoPlus extends Mod {
     private static final int MAX_REQUESTS_PER_TOKEN = 50;
     private static final long RATE_LIMIT_RESET_TIME = 3600000;
     
-    private Seq<ModInfo> remoteIndex = new Seq<>();
+    private Seq<ModInfo> unifiedModList = new Seq<>();
     private Seq<ModInfo> filteredMods = new Seq<>();
     private ObjectMap<String, ModStats> statsCache = new ObjectMap<>();
     private ObjectMap<String, TextureRegion> iconCache = new ObjectMap<>();
     private ObjectMap<String, Texture> remoteIconTextures = new ObjectMap<>();
-    private ObjectSet<String> iconLoadAttempts = new ObjectSet<>();
+    private ObjectSet<String> iconLoadQueue = new ObjectSet<>();
     
     private int currentPage = 0;
     private int modsPerPage = 10;
@@ -83,7 +82,7 @@ public class ModInfoPlus extends Mod {
     private TextureRegion jsBadge;
 
     public ModInfoPlus() {
-        Log.info("ModInfo+ Browser Initializing with FIXES");
+        Log.info("ModInfo+ HELIUM Architecture Initialized");
         initTokens();
         loadSettings();
     }
@@ -208,13 +207,260 @@ public class ModInfoPlus extends Mod {
                 showModInfoBrowser();
             });
         });
-    }void addModInfoSettings() {
+    }
+    
+    void buildUnifiedModList() {
+        updateStatusLabel("[cyan]Building unified mod list...");
+        
+        githubGet(
+            "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
+            json -> {
+                unifiedModList = parseRemoteIndex(json);
+                overlayLocalInstallData();
+                detectAllCapabilities();
+                loadAllIcons();
+                applyFilter();
+                updateVisibleMods();
+            },
+            () -> {
+                updateStatusLabel("[scarlet]Failed to load mod index");
+                buildOfflineModList();
+            }
+        );
+    }
+    
+    void buildOfflineModList() {
+        unifiedModList.clear();
+        for(Mods.LoadedMod installed : Vars.mods.list()) {
+            ModInfo info = createModInfoFromInstalled(installed);
+            unifiedModList.add(info);
+        }
+        applyFilter();
+        updateVisibleMods();
+    }
+    
+    void overlayLocalInstallData() {
+        for(ModInfo mod : unifiedModList) {
+            for(Mods.LoadedMod installed : Vars.mods.list()) {
+                String installedName = installed.meta != null ? installed.meta.name : installed.name;
+                if(installedName.equalsIgnoreCase(mod.name) || installedName.equalsIgnoreCase(mod.displayName)) {
+                    mod.isInstalled = true;
+                    mod.isEnabled = installed.enabled();
+                    mod.installedMod = installed;
+                    mod.localVersion = installed.meta != null ? installed.meta.version : "?";
+                    
+                    if(installed.iconTexture != null) {
+                        String key = mod.name.toLowerCase();
+                        iconCache.put(key, new TextureRegion(installed.iconTexture));
+                    }
+                    
+                    detectLocalCapabilities(mod, installed);
+                    break;
+                }
+            }
+        }
+    }void detectAllCapabilities() {
+        for(ModInfo mod : unifiedModList) {
+            if(mod.isInstalled && mod.installedMod != null) {
+                continue;
+            }
+            
+            if(mod.repo.isEmpty()) continue;
+            
+            String key = "cap_" + mod.repo;
+            if(iconLoadQueue.contains(key)) continue;
+            iconLoadQueue.add(key);
+            
+            githubGet(
+                "https://api.github.com/repos/" + mod.repo + "/contents",
+                json -> {
+                    parseModContents(mod, json);
+                    Core.app.post(this::updateVisibleMods);
+                },
+                () -> {}
+            );
+        }
+    }
+    
+    void detectLocalCapabilities(ModInfo info, Mods.LoadedMod mod) {
+        info.hasJava = mod.main != null;
+        info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
+        info.hasHjson = mod.root != null && mod.root.child("mod.hjson").exists();
+        
+        info.touchesUI = false;
+        info.touchesContent = false;
+        
+        if(mod.main != null) {
+            String src = mod.main.getClass().getName();
+            if(src.contains("ui") || src.contains("dialog") || src.contains("Draw")) {
+                info.touchesUI = true;
+            }
+        }
+        
+        if(mod.root != null) {
+            if(mod.root.child("content").exists()) info.touchesContent = true;
+            if(mod.root.child("blocks").exists()) info.touchesContent = true;
+            if(mod.root.child("items").exists()) info.touchesContent = true;
+            if(mod.root.child("units").exists()) info.touchesContent = true;
+        }
+        
+        info.clientOnly = info.touchesUI && !info.touchesContent;
+        info.serverCompatible = !info.clientOnly;
+    }
+    
+    void parseModContents(ModInfo mod, String json) {
+        try {
+            JsonValue contents = new JsonReader().parse(json);
+            
+            mod.hasJava = false;
+            mod.hasScripts = false;
+            mod.hasHjson = false;
+            mod.touchesContent = false;
+            
+            for(JsonValue item : contents) {
+                String name = item.getString("name", "");
+                String type = item.getString("type", "");
+                
+                if(type.equals("dir")) {
+                    if(name.equals("src")) mod.hasJava = true;
+                    if(name.equals("scripts")) mod.hasScripts = true;
+                    if(name.equals("content")) mod.touchesContent = true;
+                    if(name.equals("blocks")) mod.touchesContent = true;
+                    if(name.equals("items")) mod.touchesContent = true;
+                    if(name.equals("units")) mod.touchesContent = true;
+                }
+                
+                if(type.equals("file")) {
+                    if(name.equals("mod.hjson") || name.equals("mod.json")) mod.hasHjson = true;
+                }
+            }
+            
+            mod.clientOnly = !mod.touchesContent && (mod.hasScripts || mod.touchesUI);
+            mod.serverCompatible = !mod.clientOnly;
+            
+        } catch(Exception e) {
+            Log.err("Parse contents failed for " + mod.name, e);
+        }
+    }
+    
+    void loadAllIcons() {
+        for(ModInfo mod : unifiedModList) {
+            String key = mod.name.toLowerCase();
+            
+            if(iconCache.containsKey(key)) continue;
+            if(iconLoadQueue.contains(key)) continue;
+            
+            if(mod.isInstalled && mod.installedMod != null && mod.installedMod.iconTexture != null) {
+                iconCache.put(key, new TextureRegion(mod.installedMod.iconTexture));
+                continue;
+            }
+            
+            if(!mod.repo.isEmpty()) {
+                iconLoadQueue.add(key);
+                loadIconFromGitHub(mod, "master", "icon.png");
+            }
+        }
+    }
+    
+    void loadIconFromGitHub(ModInfo mod, String branch, String filename) {
+        String iconUrl = "https://raw.githubusercontent.com/" + mod.repo + "/" + branch + "/" + filename;
+        
+        Http.get(iconUrl)
+            .timeout(10000)
+            .error(e -> {
+                if(branch.equals("master") && filename.equals("icon.png")) {
+                    Core.app.post(() -> loadIconFromGitHub(mod, "main", "icon.png"));
+                } else if(branch.equals("main") && filename.equals("icon.png")) {
+                    Core.app.post(() -> loadIconFromGitHub(mod, branch, "icon.jpg"));
+                } else if(filename.equals("icon.jpg")) {
+                    Core.app.post(() -> loadIconFromGitHub(mod, branch, "icon.jpeg"));
+                }
+            })
+            .submit(res -> {
+                try {
+                    byte[] data = res.getResult();
+                    Pixmap pixmap = new Pixmap(data);
+                    Texture tex = new Texture(pixmap);
+                    pixmap.dispose();
+                    
+                    Core.app.post(() -> {
+                        String key = mod.name.toLowerCase();
+                        iconCache.put(key, new TextureRegion(tex));
+                        remoteIconTextures.put(key, tex);
+                        updateVisibleMods();
+                    });
+                } catch(Exception e) {
+                    Log.err("Icon decode failed for " + mod.name, e);
+                }
+            });
+    }
+    
+    ModInfo createModInfoFromInstalled(Mods.LoadedMod mod) {
+        ModInfo info = new ModInfo();
+        
+        if(mod.meta != null) {
+            info.displayName = mod.meta.displayName != null ? mod.meta.displayName : mod.meta.name;
+            info.name = mod.meta.name;
+            info.author = mod.meta.author;
+            info.description = mod.meta.description;
+            info.version = mod.meta.version;
+            info.repo = mod.meta.repo != null ? mod.meta.repo : "";
+        } else {
+            info.displayName = mod.name;
+            info.name = mod.name;
+            info.author = "Unknown";
+            info.description = "";
+            info.version = "1.0";
+            info.repo = "";
+        }
+        
+        info.installedMod = mod;
+        info.isInstalled = true;
+        info.isEnabled = mod.enabled();
+        info.localVersion = info.version;
+        detectLocalCapabilities(info, mod);
+        
+        if(mod.iconTexture != null) {
+            String key = info.name.toLowerCase();
+            iconCache.put(key, new TextureRegion(mod.iconTexture));
+        }
+        
+        return info;
+    }
+    
+    Seq<ModInfo> parseRemoteIndex(String json) {
+        Seq<ModInfo> mods = new Seq<>();
+        try {
+            JsonValue root = new JsonReader().parse(json);
+            for(JsonValue modJson : root) {
+                ModInfo mod = new ModInfo();
+                mod.repo = modJson.getString("repo", "");
+                mod.name = modJson.getString("name", "Unknown");
+                mod.displayName = mod.name;
+                mod.author = modJson.getString("author", "Unknown");
+                mod.description = modJson.getString("description", "");
+                mod.version = modJson.getString("minGameVersion", "?");
+                mod.lastUpdated = modJson.getString("lastUpdated", "");
+                mod.stars = modJson.getInt("stars", 0);
+                mod.isVerified = mod.stars >= verifiedStarThreshold;
+                
+                if(!mod.repo.isEmpty() && !mod.name.isEmpty()) {
+                    mods.add(mod);
+                }
+            }
+        } catch(Exception e) {
+            Log.err("Parse remote index failed", e);
+        }
+        return mods;
+    }
+    
+    void addModInfoSettings() {
         Vars.ui.settings.addCategory("ModInfo+ Browser", Icon.book, table -> {
             table.add("[accent]ModInfo+ Browser Settings").pad(10f).row();
             table.image().height(3f).width(400f).color(accentColor).pad(5f).row();
             
             table.add("[cyan]Display Settings").left().pad(8f).row();
-            table.add("[lightgray]Changes require dialog reopen").left().padLeft(20f).row();
+            table.add("[lightgray]These changes require reopening the browser").left().padLeft(20f).row();
             
             table.table(t -> {
                 t.add("UI Scale: ").left().padRight(10f);
@@ -275,7 +521,7 @@ public class ModInfoPlus extends Mod {
             
             table.image().height(2f).width(400f).color(Color.gray).pad(8f).row();
             table.add("[cyan]Badge Settings").left().pad(8f).row();
-            table.add("[lightgray]Changes require dialog reopen").left().padLeft(20f).row();
+            table.add("[lightgray]These changes require reopening the browser").left().padLeft(20f).row();
             
             table.table(t -> {
                 t.add("Badge Display Width: ").left().padRight(10f);
@@ -371,7 +617,7 @@ public class ModInfoPlus extends Mod {
                 Vars.ui.showInfo("[lime]Settings reset to defaults");
             }).size(250f, 50f).pad(10f);
             
-            table.add("[lightgray]ModInfo+ v2.1 FIXED").pad(10f);
+            table.add("[lightgray]ModInfo+ v2.5 HELIUM").pad(10f);
         });
     }
     
@@ -388,11 +634,12 @@ public class ModInfoPlus extends Mod {
             mainDialog.show();
             return;
         }
+        
         mainDialog = new BaseDialog("ModInfo+ Browser");
         mainDialog.addCloseButton();
         mainDialog.hidden(() -> {
             if(needsRestart) {
-                Vars.ui.showConfirm("Restart Required", "[cyan]Mods were installed/changed.\n[yellow]Restart the game?", () -> {
+                Vars.ui.showConfirm("Restart Required", "[cyan]Mods were installed or changed.\n[yellow]Restart the game now?", () -> {
                     Core.app.exit();
                 });
                 needsRestart = false;
@@ -415,7 +662,7 @@ public class ModInfoPlus extends Mod {
         mainDialog.cont.add(main).size(width, height);
         mainDialog.show();
         
-        switchTab(0);
+        buildUnifiedModList();
     }
     
     void buildPortraitLayout(Table main) {
@@ -440,7 +687,6 @@ public class ModInfoPlus extends Mod {
                 searchQuery = searchField.getText().toLowerCase();
                 currentPage = 0;
                 applyFilter();
-                updateVisibleMods();
             });
             search.add(searchField).growX().height(40f * uiScale).pad(8f);
         }).fillX().row();
@@ -480,7 +726,6 @@ public class ModInfoPlus extends Mod {
                 searchQuery = searchField.getText().toLowerCase();
                 currentPage = 0;
                 applyFilter();
-                updateVisibleMods();
             });
             search.add(searchField).growX().height(50f * uiScale).pad(10f);
         }).fillX().row();
@@ -496,9 +741,7 @@ public class ModInfoPlus extends Mod {
         
         paginationBar = new Table();
         main.add(paginationBar).fillX().row();
-    }
-    
-    void buildHeader() {
+    }void buildHeader() {
         headerContainer.clearChildren();
         headerContainer.background(Tex.button);
         
@@ -568,14 +811,16 @@ public class ModInfoPlus extends Mod {
         Vars.platform.showFileChooser(true, "zip", "jar", file -> {
             try {
                 Vars.mods.importMod(file);
-                Vars.ui.showInfo("[lime]Mod imported!\n[yellow]Restart required");
+                Vars.ui.showInfo("[lime]Mod imported!\n[yellow]Game restart required");
                 needsRestart = true;
                 reloadMods();
             } catch(Exception e) {
                 Vars.ui.showErrorMessage("Import failed: " + e.getMessage());
             }
         });
-    }void switchTab(int tab) {
+    }
+    
+    void switchTab(int tab) {
         currentTab = tab;
         currentPage = 0;
         searchQuery = "";
@@ -583,20 +828,48 @@ public class ModInfoPlus extends Mod {
         filterMode = "all";
         if(searchField != null) searchField.setText("");
         buildHeader();
-        
-        if(tab == 0) fetchEnabledMods();
-        else if(tab == 1) fetchDisabledMods();
-        else fetchRemoteIndex();
+        applyFilter();
     }
-
+    
     void reloadMods() {
-        remoteIndex.clear();
+        unifiedModList.clear();
         filteredMods.clear();
         statsCache.clear();
-        iconLoadAttempts.clear();
-        switchTab(currentTab);
+        iconLoadQueue.clear();
+        buildUnifiedModList();
     }
-
+    
+    void applyFilter() {
+        filteredMods.clear();
+        
+        for(ModInfo mod : unifiedModList) {
+            boolean matchesTab = true;
+            if(currentTab == 0) matchesTab = mod.isInstalled && mod.isEnabled;
+            else if(currentTab == 1) matchesTab = mod.isInstalled && !mod.isEnabled;
+            
+            if(!matchesTab) continue;
+            
+            boolean matchesSearch = searchQuery.isEmpty() || 
+                mod.displayName.toLowerCase().contains(searchQuery) || 
+                mod.name.toLowerCase().contains(searchQuery) ||
+                mod.author.toLowerCase().contains(searchQuery) ||
+                mod.description.toLowerCase().contains(searchQuery);
+            
+            if(!matchesSearch) continue;
+            
+            boolean matchesFilter = true;
+            if(filterMode.equals("java")) matchesFilter = mod.hasJava;
+            else if(filterMode.equals("js")) matchesFilter = mod.hasScripts;
+            else if(filterMode.equals("server")) matchesFilter = mod.serverCompatible;
+            
+            if(matchesFilter) {
+                filteredMods.add(mod);
+            }
+        }
+        
+        applySorting();
+    }
+    
     void applySorting() {
         if(sortMode == 0) {
             filteredMods.sort((a, b) -> b.lastUpdated.compareTo(a.lastUpdated));
@@ -605,7 +878,36 @@ public class ModInfoPlus extends Mod {
         }
         updateVisibleMods();
     }
-
+    
+    void updateVisibleMods() {
+        if(modListContainer == null) return;
+        modListContainer.clearChildren();
+        
+        if(currentTab == 2) {
+            int start = currentPage * modsPerPage;
+            int end = Math.min(start + modsPerPage, filteredMods.size);
+            
+            if(filteredMods.isEmpty()) {
+                modListContainer.add("[lightgray]No mods found").pad(40f);
+            } else {
+                for(int i = start; i < end; i++) {
+                    buildModRow(modListContainer, filteredMods.get(i));
+                }
+            }
+            buildPaginationBar();
+        } else {
+            if(filteredMods.isEmpty()) {
+                modListContainer.add("[lightgray]No mods found").pad(40f);
+            } else {
+                for(ModInfo mod : filteredMods) {
+                    buildModRow(modListContainer, mod);
+                }
+            }
+        }
+        
+        updateStatusLabel("Showing " + filteredMods.size + " mods");
+    }
+    
     void buildPaginationBar() {
         if(paginationBar == null) return;
         paginationBar.clearChildren();
@@ -632,315 +934,16 @@ public class ModInfoPlus extends Mod {
             }
         }).size(80f * uiScale, 50f * uiScale).disabled(b -> currentPage >= getMaxPage());
     }
-
-    void applyFilter() {
-        filteredMods.clear();
-        
-        for(ModInfo mod : remoteIndex) {
-            boolean matchesSearch = searchQuery.isEmpty() || 
-                mod.name.toLowerCase().contains(searchQuery) || 
-                mod.author.toLowerCase().contains(searchQuery) ||
-                mod.description.toLowerCase().contains(searchQuery);
-            
-            if(!matchesSearch) continue;
-            
-            boolean matchesFilter = true;
-            if(filterMode.equals("java")) matchesFilter = mod.hasJava;
-            else if(filterMode.equals("js")) matchesFilter = mod.hasScripts;
-            else if(filterMode.equals("server")) matchesFilter = mod.serverCompatible;
-            
-            if(matchesFilter) {
-                filteredMods.add(mod);
-            }
-        }
-        
-        applySorting();
-    }
-
-    void updateVisibleMods() {
-        if(modListContainer == null) return;
-        modListContainer.clearChildren();
-        
-        if(currentTab < 2) {
-            if(filteredMods.isEmpty()) {
-                modListContainer.add("[lightgray]No mods found").pad(40f);
-            } else {
-                for(ModInfo mod : filteredMods) {
-                    buildModRow(modListContainer, mod);
-                }
-            }
-        } else {
-            int start = currentPage * modsPerPage;
-            int end = Math.min(start + modsPerPage, filteredMods.size);
-            
-            if(filteredMods.isEmpty()) {
-                modListContainer.add("[lightgray]No mods found").pad(40f);
-            } else {
-                for(int i = start; i < end; i++) {
-                    buildModRow(modListContainer, filteredMods.get(i));
-                }
-            }
-            buildPaginationBar();
-        }
-        updateStatusLabel("Showing " + filteredMods.size + " mods");
-    }
-
+    
     void updateStatusLabel(String text) {
         if(statusLabel != null) statusLabel.setText("[lightgray]" + text);
     }
-
+    
     int getMaxPage() {
         return Math.max(0, (filteredMods.size - 1) / modsPerPage);
     }
-
-    void fetchEnabledMods() {
-        updateStatusLabel("[cyan]Loading enabled mods...");
-        Core.app.post(() -> {
-            remoteIndex.clear();
-            for(Mods.LoadedMod mod : Vars.mods.list()) {
-                if(!mod.enabled()) continue;
-                ModInfo info = createLocalModInfo(mod);
-                remoteIndex.add(info);
-            }
-            Core.app.post(() -> {
-                applyFilter();
-                updateVisibleMods();
-            });
-        });
-    }
-
-    void fetchDisabledMods() {
-        updateStatusLabel("[cyan]Loading disabled mods...");
-        Core.app.post(() -> {
-            remoteIndex.clear();
-            for(Mods.LoadedMod mod : Vars.mods.list()) {
-                if(mod.enabled()) continue;
-                ModInfo info = createLocalModInfo(mod);
-                remoteIndex.add(info);
-            }
-            Core.app.post(() -> {
-                applyFilter();
-                updateVisibleMods();
-            });
-        });
-    }
-
-    ModInfo createLocalModInfo(Mods.LoadedMod mod) {
-        ModInfo info = new ModInfo();
-        
-        if(mod.meta != null) {
-            info.name = mod.meta.name;
-            info.author = mod.meta.author;
-            info.description = mod.meta.description;
-            info.version = mod.meta.version;
-            info.repo = mod.meta.repo != null ? mod.meta.repo : "";
-        } else {
-            info.name = mod.name;
-            info.author = "Unknown";
-            info.description = "";
-            info.version = "1.0";
-            info.repo = "";
-        }
-        
-        info.installedMod = mod;
-        info.isInstalled = true;
-        detectLocalCapabilities(info, mod);
-        
-        if(mod.iconTexture != null) {
-            String key = mod.name.toLowerCase();
-            iconCache.put(key, new TextureRegion(mod.iconTexture));
-        }
-        
-        return info;
-    }
-
-    void detectLocalCapabilities(ModInfo info, Mods.LoadedMod mod) {
-        info.hasJava = mod.main != null;
-        info.hasScripts = mod.root != null && mod.root.child("scripts").exists();
-        info.hasHjson = mod.root != null && mod.root.child("mod.hjson").exists();
-        
-        info.touchesUI = false;
-        info.touchesContent = false;
-        
-        if(mod.main != null) {
-            String src = mod.main.getClass().getName();
-            if(src.contains("ui") || src.contains("dialog") || src.contains("Draw")) {
-                info.touchesUI = true;
-            }
-        }
-        
-        if(mod.root != null) {
-            if(mod.root.child("content").exists()) info.touchesContent = true;
-            if(mod.root.child("blocks").exists()) info.touchesContent = true;
-            if(mod.root.child("items").exists()) info.touchesContent = true;
-            if(mod.root.child("units").exists()) info.touchesContent = true;
-        }
-        
-        info.clientOnly = info.touchesUI && !info.touchesContent;
-        info.serverCompatible = !info.clientOnly;
-    }
-
-    void fetchRemoteIndex() {
-        updateStatusLabel("[cyan]Loading remote index...");
-        
-        githubGet(
-            "https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json",
-            json -> {
-                remoteIndex = parseRemoteIndex(json);
-                matchInstalledMods();
-                detectRemoteCapabilities();
-                loadRemoteIcons();
-                applyFilter();
-                updateVisibleMods();
-            },
-            () -> updateStatusLabel("[scarlet]Failed to load mod index")
-        );
-    }
-
-    void matchInstalledMods() {
-        for(ModInfo remoteMod : remoteIndex) {
-            for(Mods.LoadedMod installed : Vars.mods.list()) {
-                if(installed.meta != null && installed.name.equalsIgnoreCase(remoteMod.name)) {
-                    remoteMod.isInstalled = true;
-                    remoteMod.installedMod = installed;
-                    remoteMod.localVersion = installed.meta.version;
-                    
-                    if(installed.iconTexture != null) {
-                        String key = remoteMod.name.toLowerCase();
-                        iconCache.put(key, new TextureRegion(installed.iconTexture));
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    void detectRemoteCapabilities() {
-        for(ModInfo mod : remoteIndex) {
-            if(mod.repo.isEmpty()) continue;
-            
-            String key = "detect_" + mod.repo;
-            if(iconLoadAttempts.contains(key)) continue;
-            iconLoadAttempts.add(key);
-            
-            githubGet(
-                "https://api.github.com/repos/" + mod.repo + "/contents",
-                json -> parseModContents(mod, json),
-                () -> {}
-            );
-        }
-    }
-
-    void parseModContents(ModInfo mod, String json) {
-        try {
-            JsonValue contents = new JsonReader().parse(json);
-            
-            mod.hasJava = false;
-            mod.hasScripts = false;
-            mod.hasHjson = false;
-            
-            for(JsonValue item : contents) {
-                String name = item.getString("name", "");
-                String type = item.getString("type", "");
-                
-                if(type.equals("dir")) {
-                    if(name.equals("src")) mod.hasJava = true;
-                    if(name.equals("scripts")) mod.hasScripts = true;
-                    if(name.equals("content")) mod.touchesContent = true;
-                }
-                
-                if(type.equals("file")) {
-                    if(name.equals("mod.hjson")) mod.hasHjson = true;
-                }
-            }
-            
-            mod.clientOnly = !mod.touchesContent && (mod.hasScripts || mod.touchesUI);
-            mod.serverCompatible = !mod.clientOnly;
-            
-            Core.app.post(this::updateVisibleMods);
-            
-        } catch(Exception e) {
-            Log.err("Parse contents", e);
-        }
-    }
-
-    void loadRemoteIcons() {
-        for(ModInfo mod : remoteIndex) {
-            if(mod.repo.isEmpty()) continue;
-            String key = mod.name.toLowerCase();
-            if(iconCache.containsKey(key)) continue;
-            if(iconLoadAttempts.contains(key)) continue;
-            
-            iconLoadAttempts.add(key);
-            loadIconFromGitHub(mod, "master", "icon.png");
-        }
-    }
-
-    void loadIconFromGitHub(ModInfo mod, String branch, String filename) {
-        String iconUrl = "https://raw.githubusercontent.com/" + mod.repo + "/" + branch + "/" + filename;
-        
-        Http.get(iconUrl)
-            .timeout(8000)
-            .error(e -> {
-                if(branch.equals("master") && filename.equals("icon.png")) {
-                    Core.app.post(() -> loadIconFromGitHub(mod, "main", "icon.png"));
-                } else if(branch.equals("main") && filename.equals("icon.png")) {
-                    Core.app.post(() -> loadIconFromGitHub(mod, branch, "icon.jpg"));
-                }
-            })
-            .submit(res -> {
-                try {
-                    byte[] data = res.getResult();
-                    Pixmap pixmap = new Pixmap(data);
-                    Texture tex = new Texture(pixmap);
-                    pixmap.dispose();
-                    
-                    Core.app.post(() -> {
-                        String key = mod.name.toLowerCase();
-                        iconCache.put(key, new TextureRegion(tex));
-                        remoteIconTextures.put(key, tex);
-                        updateVisibleMods();
-                    });
-                } catch(Exception e) {
-                    Log.err("Icon load failed for " + mod.name, e);
-                }
-            });
-    }
-
-    Seq<ModInfo> parseRemoteIndex(String json) {
-        Seq<ModInfo> mods = new Seq<>();
-        try {
-            JsonValue root = new JsonReader().parse(json);
-            for(JsonValue modJson : root) {
-                ModInfo mod = new ModInfo();
-                mod.repo = modJson.getString("repo", "");
-                mod.name = modJson.getString("name", "Unknown");
-                mod.author = modJson.getString("author", "Unknown");
-                mod.description = modJson.getString("description", "");
-                mod.version = modJson.getString("minGameVersion", "?");
-                mod.lastUpdated = modJson.getString("lastUpdated", "");
-                mod.stars = modJson.getInt("stars", 0);
-                
-                mod.isVerified = mod.stars >= verifiedStarThreshold;
-                
-                if(!mod.repo.isEmpty() && !mod.name.isEmpty()) {
-                    mods.add(mod);
-                }
-            }
-        } catch(Exception e) {
-            Log.err("Parse error", e);
-        }
-        return mods;
-    }
-
-    String formatDate(String dateStr) {
-        try {
-            String[] parts = dateStr.split("T")[0].split("-");
-            return parts[1] + "/" + parts[2] + "/" + parts[0];
-        } catch(Exception e) {
-            return dateStr;
-        }
-    }void buildModRow(Table table, ModInfo mod) {
+    
+    void buildModRow(Table table, ModInfo mod) {
         table.table(Tex.button, row -> {
             row.left();
             
@@ -980,11 +983,11 @@ public class ModInfoPlus extends Mod {
             row.table(info -> {
                 info.left().defaults().left();
                 
-                Label nameLabel = new Label(mod.name);
+                Label nameLabel = new Label(mod.displayName);
                 nameLabel.setStyle(Styles.outlineLabel);
                 nameLabel.setColor(Color.white);
-                nameLabel.setEllipsis(true);
-                info.add(nameLabel).left().padBottom(2f).row();
+                nameLabel.setWrap(true);
+                info.add(nameLabel).growX().padBottom(2f).row();
                 
                 Table metaRow = new Table();
                 metaRow.left();
@@ -993,8 +996,11 @@ public class ModInfoPlus extends Mod {
                 versionLabel.setColor(Color.lightGray);
                 metaRow.add(versionLabel).left();
                 
-                if(mod.stars >= 10) {
-                    metaRow.add(" [yellow]★" + mod.stars).padLeft(8f);
+                if(mod.stars > 0) {
+                    Label starLabel = new Label(" [yellow]★" + mod.stars);
+                    if(mod.stars < 10) starLabel.setColor(Color.gray);
+                    else if(mod.stars < 50) starLabel.setColor(Color.lightGray);
+                    metaRow.add(starLabel).padLeft(8f);
                 }
                 
                 if(mod.isVerified) {
@@ -1011,7 +1017,7 @@ public class ModInfoPlus extends Mod {
             
         }).fillX().height(rowHeight * uiScale).pad(2f).row();
     }
-
+    
     void renderBadgesOverlay(Table badgeTable, ModInfo mod) {
         badgeTable.clearChildren();
         
@@ -1027,24 +1033,24 @@ public class ModInfoPlus extends Mod {
             if(mod.hasJava && !mod.hasScripts) {
                 addBadge(topLeft, javaBadge != null ? new TextureRegionDrawable(javaBadge) : Icon.book, 
                     Color.valueOf("b07219"), "Java", "Java mod", () -> {
-                        Vars.ui.showInfo("[accent]Java Mod\n[lightgray]" + mod.name + " uses Java code");
+                        Vars.ui.showInfo("[accent]Java Mod\n[lightgray]" + mod.displayName + " uses Java code");
                     });
             } else if(mod.hasScripts && !mod.hasJava) {
                 addBadge(topLeft, jsBadge != null ? new TextureRegionDrawable(jsBadge) : Icon.logic, 
                     Color.valueOf("f1e05a"), "JS", "JavaScript mod", () -> {
-                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]" + mod.name + " uses JS scripts");
+                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]" + mod.displayName + " uses JS scripts");
                     });
             } else if(mod.hasJava && mod.hasScripts) {
                 addBadge(topLeft, Icon.warning, Color.orange, "Mixed", "Java + JS", () -> {
-                        Vars.ui.showInfo("[accent]Mixed Languages\n[lightgray]" + mod.name + " uses both Java and JS");
+                        Vars.ui.showInfo("[accent]Mixed Languages\n[lightgray]" + mod.displayName + " uses both Java and JS");
                     });
             }
         }
         
         if(showStatusBadges) {
-            if(mod.isInstalled && mod.installedMod != null && mod.installedMod.enabled()) {
+            if(mod.isInstalled && mod.isEnabled) {
                 addBadge(topRight, Icon.ok, Color.lime, "Active", "Currently enabled", () -> {
-                    Vars.ui.showInfo("[lime]Mod Enabled\n[lightgray]" + mod.name + " is currently active");
+                    Vars.ui.showInfo("[lime]Mod Enabled\n[lightgray]" + mod.displayName + " is currently active");
                 });
             }
             
@@ -1061,7 +1067,7 @@ public class ModInfoPlus extends Mod {
         
         if(showUpdateBadge && mod.isInstalled && !mod.localVersion.isEmpty() && !mod.version.equals(mod.localVersion)) {
             addBadge(bottomRight, Icon.upload, Color.cyan, "Update", "New version available", () -> {
-                Vars.ui.showConfirm("Update " + mod.name + "?", 
+                Vars.ui.showConfirm("Update " + mod.displayName + "?", 
                     "[cyan]Local: " + mod.localVersion + "\n[lime]Remote: " + mod.version + "\n\n[yellow]Download update?",
                     () -> downloadMod(mod)
                 );
@@ -1074,7 +1080,7 @@ public class ModInfoPlus extends Mod {
         badgeTable.add().expand();
         badgeTable.add(bottomRight).expand().bottom().right().pad(badgeSpacing * uiScale);
     }
-
+    
     void renderBadgesSide(Table badgeTable, ModInfo mod) {
         badgeTable.clearChildren();
         badgeTable.left().defaults().left().size(badgeSize * uiScale).pad(badgeSpacing * uiScale);
@@ -1083,24 +1089,24 @@ public class ModInfoPlus extends Mod {
             if(mod.hasJava && !mod.hasScripts) {
                 addBadge(badgeTable, javaBadge != null ? new TextureRegionDrawable(javaBadge) : Icon.book, 
                     Color.valueOf("b07219"), "Java", "Java mod", () -> {
-                        Vars.ui.showInfo("[accent]Java Mod\n[lightgray]" + mod.name + " uses Java code");
+                        Vars.ui.showInfo("[accent]Java Mod\n[lightgray]" + mod.displayName + " uses Java code");
                     });
             } else if(mod.hasScripts && !mod.hasJava) {
                 addBadge(badgeTable, jsBadge != null ? new TextureRegionDrawable(jsBadge) : Icon.logic, 
                     Color.valueOf("f1e05a"), "JS", "JavaScript mod", () -> {
-                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]" + mod.name + " uses JS scripts");
+                        Vars.ui.showInfo("[accent]JavaScript Mod\n[lightgray]" + mod.displayName + " uses JS scripts");
                     });
             } else if(mod.hasJava && mod.hasScripts) {
                 addBadge(badgeTable, Icon.warning, Color.orange, "Mixed", "Java + JS", () -> {
-                        Vars.ui.showInfo("[accent]Mixed Languages\n[lightgray]" + mod.name + " uses both Java and JS");
+                        Vars.ui.showInfo("[accent]Mixed Languages\n[lightgray]" + mod.displayName + " uses both Java and JS");
                     });
             }
         }
         
         if(showStatusBadges) {
-            if(mod.isInstalled && mod.installedMod != null && mod.installedMod.enabled()) {
+            if(mod.isInstalled && mod.isEnabled) {
                 addBadge(badgeTable, Icon.ok, Color.lime, "Active", "Currently enabled", () -> {
-                    Vars.ui.showInfo("[lime]Mod Enabled\n[lightgray]" + mod.name + " is currently active");
+                    Vars.ui.showInfo("[lime]Mod Enabled\n[lightgray]" + mod.displayName + " is currently active");
                 });
             }
             
@@ -1117,14 +1123,14 @@ public class ModInfoPlus extends Mod {
         
         if(showUpdateBadge && mod.isInstalled && !mod.localVersion.isEmpty() && !mod.version.equals(mod.localVersion)) {
             addBadge(badgeTable, Icon.upload, Color.cyan, "Update", "New version available", () -> {
-                Vars.ui.showConfirm("Update " + mod.name + "?", 
+                Vars.ui.showConfirm("Update " + mod.displayName + "?", 
                     "[cyan]Local: " + mod.localVersion + "\n[lime]Remote: " + mod.version + "\n\n[yellow]Download update?",
                     () -> downloadMod(mod)
                 );
             });
         }
     }
-
+    
     void addBadge(Table parent, Drawable icon, Color baseColor, String title, String desc, Runnable onClick) {
         Table badgeWrap = new Table();
         badgeWrap.touchable = Touchable.enabled;
@@ -1153,7 +1159,7 @@ public class ModInfoPlus extends Mod {
             });
         }
     }
-
+    
     TextureRegion getModIcon(ModInfo mod) {
         String key = mod.name.toLowerCase();
         if(iconCache.containsKey(key)) {
@@ -1161,40 +1167,49 @@ public class ModInfoPlus extends Mod {
         }
         return null;
     }
-
-    void toggleMod(ModInfo mod) {
+    
+    String formatDate(String dateStr) {
+        try {
+            String[] parts = dateStr.split("T")[0].split("-");
+            return parts[1] + "/" + parts[2] + "/" + parts[0];
+        } catch(Exception e) {
+            return dateStr;
+        }
+    }void toggleMod(ModInfo mod) {
         if(mod.installedMod == null) return;
         
         if(mod.installedMod.enabled()) {
             Vars.mods.setEnabled(mod.installedMod, false);
-            Vars.ui.showInfo("[orange]Disabled " + mod.name + "\n[lightgray]Restart required");
+            mod.isEnabled = false;
+            Vars.ui.showInfo("[orange]Disabled " + mod.displayName + "\n[yellow]Game restart required");
         } else {
             Vars.mods.setEnabled(mod.installedMod, true);
-            Vars.ui.showInfo("[lime]Enabled " + mod.name + "\n[lightgray]Restart required");
+            mod.isEnabled = true;
+            Vars.ui.showInfo("[lime]Enabled " + mod.displayName + "\n[yellow]Game restart required");
         }
         
         needsRestart = true;
-        reloadMods();
+        applyFilter();
     }
-
+    
     void deleteMod(ModInfo mod) {
         if(mod.installedMod == null) return;
         
-        Vars.ui.showConfirm("Delete " + mod.name + "?", () -> {
+        Vars.ui.showConfirm("Delete " + mod.displayName + "?", () -> {
             Vars.mods.removeMod(mod.installedMod);
-            Vars.ui.showInfo("[scarlet]Deleted " + mod.name + "\n[lightgray]Restart required");
+            Vars.ui.showInfo("[scarlet]Deleted " + mod.displayName + "\n[yellow]Game restart required");
             needsRestart = true;
             reloadMods();
         });
     }
-
+    
     void downloadMod(ModInfo mod) {
         if(mod.repo.isEmpty()) {
             Vars.ui.showErrorMessage("No repository URL");
             return;
         }
         
-        updateStatusLabel("[cyan]Downloading " + mod.name + "...");
+        updateStatusLabel("[cyan]Downloading " + mod.displayName + "...");
         
         githubGet(
             "https://api.github.com/repos/" + mod.repo + "/releases/latest",
@@ -1232,13 +1247,13 @@ public class ModInfoPlus extends Mod {
             () -> downloadFromZipball(mod)
         );
     }
-
+    
     void downloadFromZipball(ModInfo mod) {
         String zipUrl = "https://github.com/" + mod.repo + "/archive/refs/heads/master.zip";
         Vars.ui.showInfo("[cyan]Downloading repository...");
         downloadModFile(mod, zipUrl);
     }
-
+    
     void downloadModFile(ModInfo mod, String url) {
         try {
             arc.files.Fi file = Vars.tmpDirectory.child(mod.name + "-temp.zip");
@@ -1266,7 +1281,9 @@ public class ModInfoPlus extends Mod {
             Vars.ui.showErrorMessage("Download error");
             updateStatusLabel("[scarlet]Download error");
         }
-    }void installDownloadedMod(ModInfo mod, arc.files.Fi zipFile) {
+    }
+    
+    void installDownloadedMod(ModInfo mod, arc.files.Fi zipFile) {
         try {
             arc.files.Fi modsDir = Vars.modDirectory;
             arc.files.Fi extractDir = modsDir.child(mod.name);
@@ -1308,7 +1325,7 @@ public class ModInfoPlus extends Mod {
             zipFile.delete();
             
             Vars.mods.load();
-            Vars.ui.showInfo("[lime]Installed " + mod.name + "!\n[yellow]Restart required");
+            Vars.ui.showInfo("[lime]Installed " + mod.displayName + "!\n[yellow]Game restart required");
             
             needsRestart = true;
             Core.app.post(this::reloadMods);
@@ -1319,9 +1336,9 @@ public class ModInfoPlus extends Mod {
             updateStatusLabel("[scarlet]Install failed");
         }
     }
-
+    
     void showModDetails(ModInfo mod) {
-        BaseDialog dialog = new BaseDialog(mod.name);
+        BaseDialog dialog = new BaseDialog(mod.displayName);
         dialog.addCloseButton();
         
         Table content = new Table(Tex.pane);
@@ -1334,7 +1351,11 @@ public class ModInfoPlus extends Mod {
             content.image(Icon.box).size(80f * uiScale).color(Color.gray).pad(10f).row();
         }
         
-        content.add("[accent]" + mod.name).pad(5f).row();
+        Label nameLabel = new Label("[accent]" + mod.displayName);
+        nameLabel.setWrap(true);
+        nameLabel.setAlignment(Align.center);
+        content.add(nameLabel).width(450f * uiScale).pad(5f).row();
+        
         content.add("[cyan]by " + mod.author).pad(5f).row();
         content.add("[lightgray]v" + mod.version).pad(3f).row();
         
@@ -1346,7 +1367,8 @@ public class ModInfoPlus extends Mod {
         }
         
         if(mod.stars > 0) {
-            content.add("[yellow]★ " + mod.stars + " stars").pad(3f).row();
+            String starColor = mod.stars < 10 ? "gray" : (mod.stars < 50 ? "lightgray" : "yellow");
+            content.add("[" + starColor + "]★ " + mod.stars + " stars").pad(3f).row();
         }
         
         if(!mod.description.isEmpty()) {
@@ -1356,6 +1378,30 @@ public class ModInfoPlus extends Mod {
             desc.setColor(Color.lightGray);
             content.add(desc).width(450f * uiScale).pad(10f).row();
         }
+        
+        content.image().height(3f).width(400f * uiScale).color(accentColor).pad(10f).row();
+        
+        Table capTable = new Table();
+        capTable.defaults().left().pad(3f);
+        
+        if(mod.hasJava) {
+            capTable.add("[#b07219]■[] Java code").row();
+        }
+        if(mod.hasScripts) {
+            capTable.add("[#f1e05a]■[] JavaScript").row();
+        }
+        if(mod.serverCompatible) {
+            capTable.add("[sky]■[] Server compatible").row();
+        }
+        if(mod.clientOnly) {
+            capTable.add("[scarlet]■[] Client only").row();
+        }
+        if(mod.isInstalled) {
+            String status = mod.isEnabled ? "[lime]■[] Enabled" : "[orange]■[] Disabled";
+            capTable.add(status).row();
+        }
+        
+        content.add(capTable).pad(5f).row();
         
         content.image().height(3f).width(400f * uiScale).color(accentColor).pad(10f).row();
         
@@ -1381,8 +1427,8 @@ public class ModInfoPlus extends Mod {
                     dialog.hide();
                 }).size(220f * uiScale, 55f * uiScale).pad(5f);
             } else if(mod.installedMod != null) {
-                actions.button(mod.installedMod.enabled() ? "Disable" : "Enable", 
-                    mod.installedMod.enabled() ? Icon.cancel : Icon.ok, () -> {
+                actions.button(mod.isEnabled ? "Disable" : "Enable", 
+                    mod.isEnabled ? Icon.cancel : Icon.ok, () -> {
                     toggleMod(mod);
                     dialog.hide();
                 }).size(220f * uiScale, 55f * uiScale).pad(5f);
@@ -1400,7 +1446,7 @@ public class ModInfoPlus extends Mod {
         dialog.cont.add(pane).grow();
         dialog.show();
     }
-
+    
     void loadGitHubStats(ModInfo mod, Table statsTable) {
         String key = mod.repo;
         if(statsCache.containsKey(key)) {
@@ -1426,18 +1472,20 @@ public class ModInfoPlus extends Mod {
             () -> displayStatsError(statsTable, mod)
         );
     }
-
+    
     ModStats parseRepoStats(String json) {
         ModStats stats = new ModStats();
         try {
             JsonValue repoJson = new JsonReader().parse(json);
             stats.stars = repoJson.getInt("stargazers_count", 0);
+            stats.forks = repoJson.getInt("forks_count", 0);
+            stats.openIssues = repoJson.getInt("open_issues_count", 0);
         } catch(Exception e) {
-            Log.err("Parse repo", e);
+            Log.err("Parse repo stats", e);
         }
         return stats;
     }
-
+    
     void parseReleaseStats(ModStats stats, String json) {
         try {
             JsonValue releasesJson = new JsonReader().parse(json);
@@ -1454,10 +1502,10 @@ public class ModInfoPlus extends Mod {
             }
             stats.downloads = totalDownloads;
         } catch(Exception e) {
-            Log.err("Parse releases", e);
+            Log.err("Parse release stats", e);
         }
     }
-
+    
     void displayStats(Table statsTable, ModInfo mod, ModStats stats) {
         Core.app.post(() -> {
             statsTable.clearChildren();
@@ -1466,11 +1514,25 @@ public class ModInfoPlus extends Mod {
             statsTable.add("[yellow]★ Stars:").padRight(15f);
             statsTable.add("[white]" + stats.stars).row();
             
-            statsTable.add("[lime]↓ Downloads:").padRight(15f);
-            statsTable.add("[white]" + stats.downloads).row();
+            if(stats.downloads > 0) {
+                statsTable.add("[lime]↓ Downloads:").padRight(15f);
+                statsTable.add("[white]" + stats.downloads).row();
+            }
             
-            statsTable.add("[cyan]⚡ Releases:").padRight(15f);
-            statsTable.add("[white]" + stats.releases).row();
+            if(stats.releases > 0) {
+                statsTable.add("[cyan]⚡ Releases:").padRight(15f);
+                statsTable.add("[white]" + stats.releases).row();
+            }
+            
+            if(stats.forks > 0) {
+                statsTable.add("[sky]⚑ Forks:").padRight(15f);
+                statsTable.add("[white]" + stats.forks).row();
+            }
+            
+            if(stats.openIssues > 0) {
+                statsTable.add("[orange]⚠ Issues:").padRight(15f);
+                statsTable.add("[white]" + stats.openIssues).row();
+            }
             
             if(!mod.lastUpdated.isEmpty()) {
                 statsTable.add("[lightgray]Updated:").padRight(15f);
@@ -1478,7 +1540,7 @@ public class ModInfoPlus extends Mod {
             }
         });
     }
-
+    
     void displayStatsError(Table statsTable, ModInfo mod) {
         Core.app.post(() -> {
             statsTable.clearChildren();
@@ -1490,17 +1552,17 @@ public class ModInfoPlus extends Mod {
                 statsTable.add("[lightgray]" + formatDate(mod.lastUpdated)).row();
             }
         });
-    }
-
-    class ModInfo {
+    }class ModInfo {
         String repo = "";
         String name = "";
+        String displayName = "";
         String author = "";
         String description = "";
         String version = "";
         String localVersion = "";
         String lastUpdated = "";
         int stars = 0;
+        
         boolean hasJava = false;
         boolean hasScripts = false;
         boolean hasHjson = false;
@@ -1508,14 +1570,19 @@ public class ModInfoPlus extends Mod {
         boolean clientOnly = false;
         boolean touchesUI = false;
         boolean touchesContent = false;
+        
         boolean isInstalled = false;
+        boolean isEnabled = false;
         boolean isVerified = false;
+        
         Mods.LoadedMod installedMod = null;
     }
-
+    
     class ModStats {
         int downloads = 0;
         int releases = 0;
         int stars = 0;
+        int forks = 0;
+        int openIssues = 0;
     }
 }
