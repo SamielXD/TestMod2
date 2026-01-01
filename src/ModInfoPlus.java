@@ -1221,7 +1221,7 @@ public class ModInfoPlus extends Mod {
     
     TextureRegion getModIcon(ModInfo mod) {
         if(mod.repo.isEmpty()) return null;
-        return iconCache.get(mod.repo, null);
+        return iconCache.get(mod.repo);
     }
     
     String formatDate(String dateStr) {
