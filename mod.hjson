@@ -1,4 +1,4 @@
-name: "testmod"
+name: "ModInfoPlus"
 displayName: "[cyan]ModInfo+[] [accent]Enhanced[]"
 author: "[accent]SamielXD[]"
 description: '''
@@ -33,6 +33,6 @@ Thanks for using ModInfo+! 🎉
 '''
 version: "1.0"
 minGameVersion: "154"
-main: "TestMod"
+main: "ModInfoPlus"
 dependencies: []
 hidden: false
