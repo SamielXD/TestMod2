@@ -89,17 +89,6 @@ public class TooltipsPlusMod extends Mod {
     }
 
     void suppressVanillaTooltips() {
-        Events.run(EventType.Trigger.update, () -> {
-            if (!enabled) return;
-            
-            try {
-                if (Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
-                    Vars.ui.hudfrag.blockfrag.visible = false;
-                }
-            } catch (Exception e) {
-            }
-        });
-        
         for (Block block : Vars.content.blocks()) {
             if (block.description != null && block.description.length() > 10) {
                 block.description = "";
