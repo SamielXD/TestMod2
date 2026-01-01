@@ -120,9 +120,9 @@ public class TooltipsPlusMod extends Mod {
 
     void trackCombatStats() {
         Events.on(EventType.UnitDamageEvent.class, event -> {
-            if (event.unit != null) {
+            if (event.unit != null && event.bullet != null) {
                 int unitId = event.unit.id % 100;
-                damageDealt[unitId] += event.bullet != null ? event.bullet.damage : 0f;
+                damageDealt[unitId] += event.bullet.damage();
             }
         });
     }void setupTooltipSystem() {
@@ -264,7 +264,7 @@ public class TooltipsPlusMod extends Mod {
         
         if (build.items != null && build.block instanceof GenericCrafter) {
             GenericCrafter crafter = (GenericCrafter)build.block;
-            if (crafter.hasItems && build.items.total() == 0) {
+            if (crafter.hasItems && crafter.consumeItems.length > 0 && build.items.total() == 0) {
                 return "No input items - Check supply chain";
             }
             if (build.items.total() >= build.block.itemCapacity * 0.95f) {
@@ -274,7 +274,7 @@ public class TooltipsPlusMod extends Mod {
         
         if (build.liquids != null && build.block instanceof GenericCrafter) {
             GenericCrafter crafter = (GenericCrafter)build.block;
-            if (crafter.hasLiquids && build.liquids.currentAmount() < 0.1f) {
+            if (crafter.hasLiquids && crafter.consumeLiquids.length > 0 && build.liquids.currentAmount() < 0.1f) {
                 return "No liquid input - Check pipes";
             }
         }
@@ -496,7 +496,7 @@ public class TooltipsPlusMod extends Mod {
             return "[lime]⛏ Mining resources";
         } else if (unit.activelyBuilding()) {
             return "[lime]🔨 Constructing";
-        } else if (unit.isShooting) {
+        } else if (unit.isShooting()) {
             return "[scarlet]⚔ In combat";
         } else if (unit.moving()) {
             return "[sky]→ Moving";
