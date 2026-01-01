@@ -264,7 +264,7 @@ public class TooltipsPlusMod extends Mod {
         
         if (build.items != null && build.block instanceof GenericCrafter) {
             GenericCrafter crafter = (GenericCrafter)build.block;
-            if (crafter.hasItems && crafter.consumeItems.length > 0 && build.items.total() == 0) {
+            if (crafter.hasItems && build.items.total() == 0) {
                 return "No input items - Check supply chain";
             }
             if (build.items.total() >= build.block.itemCapacity * 0.95f) {
@@ -274,7 +274,7 @@ public class TooltipsPlusMod extends Mod {
         
         if (build.liquids != null && build.block instanceof GenericCrafter) {
             GenericCrafter crafter = (GenericCrafter)build.block;
-            if (crafter.hasLiquids && crafter.consumeLiquids.length > 0 && build.liquids.currentAmount() < 0.1f) {
+            if (crafter.hasLiquids && build.liquids.currentAmount() < 0.1f) {
                 return "No liquid input - Check pipes";
             }
         }
