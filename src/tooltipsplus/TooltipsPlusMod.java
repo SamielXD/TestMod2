@@ -3,13 +3,13 @@ package tooltipsplus;
 import arc.util.*;
 import mindustry.*;
 import mindustry.content.*;
-import mindustry.core.*;
-import mindustry.game.*;
+import mindustry.gen.*;
 import mindustry.mod.*;
 import mindustry.type.*;
 import mindustry.ui.*;
 import mindustry.world.*;
 import mindustry.world.blocks.power.*;
+import mindustry.world.meta.*;
 
 public class TooltipsPlusMod extends Mod {
 
@@ -21,10 +21,10 @@ public class TooltipsPlusMod extends Mod {
 
     public TooltipsPlusMod() {
         // load settings
-        enabled = Core.settings.getBool("tooltipsplus-enabled", true);
-        showTemperature = Core.settings.getBool("tooltipsplus-temp", true);
-        showItemFlags = Core.settings.getBool("tooltipsplus-itemflags", true);
-        debug = Core.settings.getBool("tooltipsplus-debug", false);
+        enabled = arc.Core.settings.getBool("tooltipsplus-enabled", true);
+        showTemperature = arc.Core.settings.getBool("tooltipsplus-temp", true);
+        showItemFlags = arc.Core.settings.getBool("tooltipsplus-itemflags", true);
+        debug = arc.Core.settings.getBool("tooltipsplus-debug", false);
     }
 
     @Override
@@ -36,18 +36,18 @@ public class TooltipsPlusMod extends Mod {
     }
 
     void saveSettings() {
-        Core.settings.put("tooltipsplus-enabled", enabled);
-        Core.settings.put("tooltipsplus-temp", showTemperature);
-        Core.settings.put("tooltipsplus-itemflags", showItemFlags);
-        Core.settings.put("tooltipsplus-debug", debug);
-        Core.settings.forceSave();
+        arc.Core.settings.put("tooltipsplus-enabled", enabled);
+        arc.Core.settings.put("tooltipsplus-temp", showTemperature);
+        arc.Core.settings.put("tooltipsplus-itemflags", showItemFlags);
+        arc.Core.settings.put("tooltipsplus-debug", debug);
+        arc.Core.settings.forceSave();
     }
 
     void injectTooltips() {
         // Blocks
         for (Block block : Vars.content.blocks()) {
             block.buildVisibility = BuildVisibility.shown;
-            block.buildCost = block.requirements != null ? block.requirements.total() : 0;
+            // buildCost doesn't exist in newer versions - removed
             block.description += "\n[accent]Tooltips+ Info:";
             if (block instanceof PowerGenerator gen) {
                 block.description += "\nPower: " + (int)(gen.powerProduction * 60f) + "/s";
@@ -93,7 +93,7 @@ public class TooltipsPlusMod extends Mod {
 
     void addSettingsUI() {
         try {
-            Vars.ui.settings.addCategory("Tooltips+", Icons.book, table -> {
+            Vars.ui.settings.addCategory("Tooltips+", Icon.book, table -> {
                 table.row();
                 table.checkPref("tooltipsplus-enabled", enabled, v -> {
                     enabled = v;
