@@ -200,310 +200,163 @@ public class TooltipsPlusMod extends Mod {
             }
         });
     }void setupTooltipSystem() {
-        tooltipTable = new Table(Styles.black);
-        tooltipTable.background(Tex.buttonEdge3);
-        tooltipTable.margin(6f);
-        tooltipTable.visible = false;
-        Vars.ui.hudGroup.addChild(tooltipTable);
-        
-        Events.run(EventType.Trigger.draw, () -> {
-            if (!enabled || Vars.state.isMenu()) {
-                tooltipTable.visible = false;
-                hoverTimer = 0f;
-                return;
-            }
-            
-            if (updateInterval.get(0, 60f)) {
-                updateProductionTracking();
-            }
-            
-            Vec2 mousePos = arc.Core.input.mouseWorld();
-            
-            Tile hoverTile = Vars.world.tileWorld(mousePos.x, mousePos.y);
-            Building hoveredBuilding = (hoverTile != null) ? hoverTile.build : null;
-            
-            Unit hoveredUnit = Groups.unit.find(u -> {
-                return u.within(mousePos.x, mousePos.y, u.hitSize / 2f);
-            });
-            
-            if (isPinned && pinnedBuilding != null) {
-                showBuildingTooltip(pinnedBuilding);
-                return;
-            }
-            
-            if (hoveredBuilding != lastHoveredBuilding || hoveredUnit != lastHoveredUnit) {
-                hoverTimer = 0f;
-                lastHoveredBuilding = hoveredBuilding;
-                lastHoveredUnit = hoveredUnit;
-                
-                if (playHoverSound && (hoveredBuilding != null || hoveredUnit != null)) {
-                    Sounds.click.play(0.3f);
-                }
-            }
-            
-            if (hoveredBuilding != null || hoveredUnit != null) {
-                hoverTimer += Time.delta / 60f;
-            }
-            
-            if (highlightHovered && hoveredBuilding != null) {
-                Lines.stroke(2f);
-                Draw.color(arc.graphics.Color.cyan, 0.6f);
-                Lines.rect(hoveredBuilding.x - hoveredBuilding.block.size * 4f, 
-                          hoveredBuilding.y - hoveredBuilding.block.size * 4f,
-                          hoveredBuilding.block.size * 8f,
-                          hoveredBuilding.block.size * 8f);
-                Draw.reset();
-            }
-            
-            if (hoverTimer >= hoverDelay) {
-                if (hoveredBuilding != null) {
-                    showBuildingTooltip(hoveredBuilding);
-                    return;
-                } else if (hoveredUnit != null) {
-                    showUnitTooltip(hoveredUnit);
-                    return;
-                }
-            }
-            
+    tooltipTable = new Table(Styles.black);
+    tooltipTable.background(Tex.buttonEdge3);
+    tooltipTable.margin(6f);
+    tooltipTable.visible = false;
+    Vars.ui.hudGroup.addChild(tooltipTable);
+
+    Events.run(EventType.Trigger.draw, () -> {
+        if (!enabled || Vars.state.isMenu()) {
             tooltipTable.visible = false;
-        });
-    }
+            hoverTimer = 0f;
+            return;
+        }
 
-    void updateProductionTracking() {
-        if (lastHoveredBuilding != null && lastHoveredBuilding.block instanceof GenericCrafter) {
-            float status = lastHoveredBuilding.power != null ? lastHoveredBuilding.power.status : 0f;
-            productionHistory[historyIndex] = status;
-            historyIndex = (historyIndex + 1) % 60;
+        if (updateInterval.get(0, 60f)) {
+            updateProductionTracking();
         }
-    }
 
-    String repeat(String str, int count) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < count; i++) {
-            sb.append(str);
-        }
-        return sb.toString();
-    }
+        Vec2 mousePos = arc.Core.input.mouseWorld();
 
-    void showBuildingTooltip(Building build) {
-        tooltipTable.clear();
-        tooltipTable.visible = true;
-        
-        Table titleRow = new Table();
-        if (showIcons && build.block.fullIcon != null) {
-            titleRow.image(build.block.fullIcon).size(24f * (fontSize + 1)).padRight(4f);
-        }
-        titleRow.add(accentColor + build.block.localizedName).style(Styles.outlineLabel);
-        tooltipTable.add(titleRow).left().row();
-        
-        if (!compactMode) {
-            tooltipTable.add(infoColor + repeat("─", 20)).padTop(2f).padBottom(2f).row();
-        }
-        
-        float healthPercent = (build.health / build.maxHealth) * 100f;
-        String healthColor = getPercentColor(healthPercent);
-        String healthBar = makeProgressBar(build.health, build.maxHealth, 10);
-        
-        tooltipTable.add(Icon.defense + statColor + "HP: " + healthColor + (int)build.health + infoColor + "/" + (int)build.maxHealth).left().row();
-        
-        if (!compactMode && healthPercent < 100f) {
-            tooltipTable.add("  " + healthBar).left().row();
-        }
-        
-        if (showWarnings && healthPercent < 30f) {
-            tooltipTable.add("  " + warningColor + "⚠ Critical Damage!").left().row();
-        }
-        
-        if (build.power != null && showPowerDetails) {
-            addPowerInfo(build);
-        }
-        
-        if (build.items != null && showStorageBreakdown) {
-            addItemStorageInfo(build);
-        }
-        
-        if (build.liquids != null) {
-            addLiquidInfo(build);
-        }
-        
-        if (showItemFlow && (build.block instanceof GenericCrafter || build.block instanceof Drill)) {
-            addProductionInfo(build);
-        }
-        
-        if (showTurretInfo && build.block instanceof Turret) {
-            addTurretInfo(build);
-        }
-        
-        if (showDrillInfo && build.block instanceof Drill) {
-            addDrillInfo(build);
-        }
-        
-        if (showConnectionInfo) {
-            addConnectionInfo(build);
-        }
-        
-        if (showPowerDetails && build.power != null) {
-            addPowerNetworkInfo(build);
-        }
-        
-        addConveyorFlowInfo(build);
-        
-        if (showTeamStats) {
-            addTeamInfo(build);
-        }
-        
-        if (isPinned) {
-            tooltipTable.add("[royal]📌 PINNED (P to unpin)").left().padTop(4f).row();
-        }
-        
-        positionTooltip();
-        tooltipTable.pack();
-    }
+        Tile hoverTile = Vars.world.tileWorld(mousePos.x, mousePos.y);
+        Building hoveredBuilding = (hoverTile != null) ? hoverTile.build : null;
 
-    void addPowerInfo(Building build) {
-        if (build.power == null) return;
-        
-        tooltipTable.add(statColor + "─ Power ─").padTop(4f).row();
-        
-        float stored = build.power.status * build.block.consPower.capacity;
-        float capacity = build.block.consPower.capacity;
-        
-        if (capacity > 0) {
-            String powerBar = makeProgressBar(stored, capacity, 10);
-            tooltipTable.add("⚡" + statColor + "Battery: " + accentColor + (int)stored + infoColor + "/" + (int)capacity).left().row();
-            if (!compactMode) {
-                tooltipTable.add("  " + powerBar).left().row();
+        Unit hoveredUnit = Groups.unit.find(u -> u.within(mousePos.x, mousePos.y, u.hitSize / 2f));
+
+        if (isPinned && pinnedBuilding != null) {
+            showBuildingTooltip(pinnedBuilding);
+            return;
+        }
+
+        if (hoveredBuilding != lastHoveredBuilding || hoveredUnit != lastHoveredUnit) {
+            hoverTimer = 0f;
+            lastHoveredBuilding = hoveredBuilding;
+            lastHoveredUnit = hoveredUnit;
+
+            if (playHoverSound && (hoveredBuilding != null || hoveredUnit != null)) {
+                Sounds.click.play(0.3f);
             }
         }
-        
-        if (build.block instanceof PowerGenerator) {
-            PowerGenerator gen = (PowerGenerator)build.block;
-            float production = gen.powerProduction * 60f;
-            tooltipTable.add("  " + successColor + "+ " + formatNumber(production) + "/s").left().row();
-        }
-        
-        if (build.block.consPower != null && build.block.consPower.usage > 0) {
-            float usage = build.block.consPower.usage * 60f;
-            tooltipTable.add("  " + warningColor + "- " + formatNumber(usage) + "/s").left().row();
-        }
-        
-        float efficiency = build.efficiency;
-        if (efficiency < 1f) {
-            tooltipTable.add("  " + infoColor + "Efficiency: " + getPercentColor(efficiency * 100f) + (int)(efficiency * 100f) + "%").left().row();
-        }
-    }
 
-    void addItemStorageInfo(Building build) {
-        if (build.items == null || build.items.total() == 0) return;
-        
-        tooltipTable.add(statColor + "─ Items ─").padTop(4f).row();
-        
-        int total = build.items.total();
-        int capacity = build.block.itemCapacity;
-        float fillPercent = (total / (float)capacity) * 100f;
-        
-        tooltipTable.add("📦" + statColor + "Storage: " + getPercentColor(fillPercent) + total + infoColor + "/" + capacity).left().row();
-        
-        if (!compactMode && fillPercent > 0) {
-            String storageBar = makeProgressBar(total, capacity, 10);
-            tooltipTable.add("  " + storageBar).left().row();
+        if (hoveredBuilding != null || hoveredUnit != null) {
+            hoverTimer += Time.delta / 60f;
         }
-        
-        if (showWarnings && fillPercent > 90f) {
-            tooltipTable.add("  " + warningColor + "⚠ Nearly Full!").left().row();
+
+        if (highlightHovered && hoveredBuilding != null) {
+            Lines.stroke(2f);
+            Draw.color(arc.graphics.Color.cyan, 0.6f);
+            Lines.rect(
+                hoveredBuilding.x - hoveredBuilding.block.size * 4f,
+                hoveredBuilding.y - hoveredBuilding.block.size * 4f,
+                hoveredBuilding.block.size * 8f,
+                hoveredBuilding.block.size * 8f
+            );
+            Draw.reset();
         }
-        
-        int itemCount = 0;
-        for (int i = 0; i < Vars.content.items().size && itemCount < 5; i++) {
-            var item = Vars.content.item(i);
-            int amount = build.items.get(item);
-            if (amount > 0) {
-                tooltipTable.add("  " + item.emoji() + " " + infoColor + item.localizedName + ": " + accentColor + amount).left().row();
-                itemCount++;
+
+        if (hoverTimer >= hoverDelay) {
+            if (hoveredBuilding != null) {
+                showBuildingTooltip(hoveredBuilding);
+                return;
+            } else if (hoveredUnit != null) {
+                showUnitTooltip(hoveredUnit);
+                return;
             }
         }
+
+        tooltipTable.visible = false;
+    });
+}
+
+void updateProductionTracking() {
+    if (lastHoveredBuilding != null && lastHoveredBuilding.block instanceof GenericCrafter) {
+        float status = lastHoveredBuilding.power != null ? lastHoveredBuilding.power.status : 0f;
+        productionHistory[historyIndex] = status;
+        historyIndex = (historyIndex + 1) % 60;
+    }
+}
+
+String repeat(String str, int count) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < count; i++) sb.append(str);
+    return sb.toString();
+}
+
+void showBuildingTooltip(Building build) {
+    tooltipTable.clear();
+    tooltipTable.visible = true;
+
+    Table titleRow = new Table();
+    if (showIcons && build.block.fullIcon != null) {
+        titleRow.image(build.block.fullIcon).size(24f * (fontSize + 1)).padRight(4f);
+    }
+    titleRow.add(accentColor + build.block.localizedName).style(Styles.outlineLabel);
+    tooltipTable.add(titleRow).left().row();
+
+    if (!compactMode) {
+        tooltipTable.add(infoColor + repeat("─", 20)).padTop(2f).padBottom(2f).row();
     }
 
-    void addLiquidInfo(Building build) {
-        if (build.liquids == null || build.liquids.total() < 0.01f) return;
-        
-        tooltipTable.add(statColor + "─ Liquids ─").padTop(4f).row();
-        
-        float total = build.liquids.total();
-        float capacity = build.block.liquidCapacity;
-        float fillPercent = (total / capacity) * 100f;
-        
-        tooltipTable.add("💧" + statColor + "Tank: " + getPercentColor(fillPercent) + Strings.autoFixed(total, 1) + infoColor + "/" + Strings.autoFixed(capacity, 1)).left().row();
-        
-        if (!compactMode) {
-            String liquidBar = makeProgressBar(total, capacity, 10);
-            tooltipTable.add("  " + liquidBar).left().row();
-        }
+    float healthPercent = (build.health / build.maxHealth) * 100f;
+    String healthColor = getPercentColor(healthPercent);
+    String healthBar = makeProgressBar(build.health, build.maxHealth, 10);
+
+    tooltipTable.add(Icon.defense + statColor + "HP: " + healthColor + (int)build.health + infoColor + "/" + (int)build.maxHealth).left().row();
+
+    if (!compactMode && healthPercent < 100f) {
+        tooltipTable.add("  " + healthBar).left().row();
     }
 
-    void addProductionInfo(Building build) {
-        if (build.block instanceof GenericCrafter) {
-            GenericCrafter crafter = (GenericCrafter)build.block;
-            
-            if (crafter.outputItems != null && crafter.outputItems.length > 0) {
-                tooltipTable.add(statColor + "─ Production ─").padTop(4f).row();
-                
-                for (var output : crafter.outputItems) {
-                    float rate = (output.amount / crafter.craftTime) * 60f;
-                    tooltipTable.add("  → " + output.item.emoji() + " " + infoColor + Strings.autoFixed(rate, 1) + "/s").left().row();
-                }
-                
-                float efficiency = build.efficiency;
-                if (efficiency < 1f) {
-                    tooltipTable.add("  " + warningColor + "⚠ " + (int)(efficiency * 100f) + "% speed").left().row();
-                }
-            }
-        }
+    if (showWarnings && healthPercent < 30f) {
+        tooltipTable.add("  " + warningColor + "⚠ Critical Damage!").left().row();
     }
 
-    void addTurretInfo(Building build) {
-        if (!(build.block instanceof Turret)) return;
-        
-        Turret turret = (Turret)build.block;
-        
-        tooltipTable.add(statColor + "─ Turret ─").padTop(4f).row();
-        
-        tooltipTable.add("  " + infoColor + "Range: " + accentColor + (int)(turret.range / 8f) + " tiles").left().row();
-        
-        if (turret.reload > 0) {
-            float shotsPerMin = (60f / turret.reload) * 60f;
-            tooltipTable.add("  " + infoColor + "Rate: " + accentColor + Strings.autoFixed(shotsPerMin, 1) + "/min").left().row();
-        }
-        
-        if (build instanceof Turret.TurretBuild) {
-            Turret.TurretBuild tb = (Turret.TurretBuild)build;
-            if (tb.hasAmmo()) {
-                tooltipTable.add("  " + successColor + "✓ Ammo Ready").left().row();
-            } else {
-                tooltipTable.add("  " + warningColor + "✗ No Ammo").left().row();
-            }
-        }
+    if (build.power != null && showPowerDetails) {
+        addPowerInfo(build);
     }
 
-    void addDrillInfo(Building build) {
-        if (!(build.block instanceof Drill)) return;
-        
-        Drill drill = (Drill)build.block;
-        
-        tooltipTable.add(statColor + "─ Drill ─").padTop(4f).row();
-        
-        tooltipTable.add("  " + infoColor + "Tier: " + accentColor + drill.tier).left().row();
-        
-        if (drill.drillTime > 0) {
-            float rate = 60f / drill.drillTime;
-            tooltipTable.add("  " + infoColor + "Speed: " + accentColor + Strings.autoFixed(rate, 1) + "/s").left().row();
-        }
-        
-        Tile tile = build.tile;
-        if (tile != null && tile.drop() != null) {
-            tooltipTable.add("  ⛏ " + tile.drop().emoji() + " " + infoColor + tile.drop().localizedName).left().row();
-        }
-    }void addTeamInfo(Building build) {
+    if (build.items != null && showStorageBreakdown) {
+        addItemStorageInfo(build);
+    }
+
+    if (build.liquids != null) {
+        addLiquidInfo(build); // <- fixed version handles 1.54
+    }
+
+    if (showItemFlow && (build.block instanceof GenericCrafter || build.block instanceof Drill)) {
+        addProductionInfo(build);
+    }
+
+    if (showTurretInfo && build.block instanceof Turret) {
+        addTurretInfo(build);
+    }
+
+    if (showDrillInfo && build.block instanceof Drill) {
+        addDrillInfo(build);
+    }
+
+    if (showConnectionInfo) {
+        addConnectionInfo(build);
+    }
+
+    if (showPowerDetails && build.power != null) {
+        addPowerNetworkInfo(build);
+    }
+
+    addConveyorFlowInfo(build);
+
+    if (showTeamStats) {
+        addTeamInfo(build);
+    }
+
+    if (isPinned) {
+        tooltipTable.add("[royal]📌 PINNED (P to unpin)").left().padTop(4f).row();
+    }
+
+    positionTooltip();
+    tooltipTable.pack();
+}void addTeamInfo(Building build) {
         if (!Vars.state.rules.pvp) return;
         
         tooltipTable.add(statColor + "─ Team ─").padTop(4f).row();
