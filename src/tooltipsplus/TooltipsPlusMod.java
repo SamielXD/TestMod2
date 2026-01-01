@@ -293,25 +293,25 @@ public class TooltipsPlusMod extends Mod {
         if (showIcons && build.block.fullIcon != null) {
             titleRow.image(build.block.fullIcon).size(24f * (fontSize + 1)).padRight(4f);
         }
-        titleRow.add(accentColor + build.block.localizedName).style(Styles.outlineLabel);
+        titleRow.add("[" + accentColor.replace("[", "").replace("]", "") + "]" + build.block.localizedName).style(Styles.outlineLabel);
         tooltipTable.add(titleRow).left().row();
         
         if (!compactMode) {
-            tooltipTable.add(infoColor + repeat("─", 20)).padTop(2f).padBottom(2f).row();
+            tooltipTable.add("[" + infoColor.replace("[", "").replace("]", "") + "]" + repeat("─", 20)).padTop(2f).padBottom(2f).row();
         }
         
         float healthPercent = (build.health / build.maxHealth) * 100f;
         String healthColor = getPercentColor(healthPercent);
         String healthBar = makeProgressBar(build.health, build.maxHealth, 10);
         
-        tooltipTable.add(Icon.defense + statColor + "HP: " + healthColor + (int)build.health + infoColor + "/" + (int)build.maxHealth).left().row();
+        tooltipTable.add("🛡 [" + statColor.replace("[", "").replace("]", "") + "]HP: [" + healthColor.replace("[", "").replace("]", "") + "]" + (int)build.health + "[" + infoColor.replace("[", "").replace("]", "") + "]/" + (int)build.maxHealth).left().row();
         
         if (!compactMode && healthPercent < 100f) {
             tooltipTable.add("  " + healthBar).left().row();
         }
         
         if (showWarnings && healthPercent < 30f) {
-            tooltipTable.add("  " + warningColor + "⚠ Critical Damage!").left().row();
+            tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]⚠ Critical Damage!").left().row();
         }
         
         if (build.power != null && showPowerDetails) {
@@ -365,10 +365,10 @@ public class TooltipsPlusMod extends Mod {
         
         tooltipTable.add(statColor + "─ Power ─").padTop(4f).row();
         
-        float stored = build.power.status * build.block.consPower.capacity;
-        float capacity = build.block.consPower.capacity;
-        
-        if (capacity > 0) {
+        if (build.block.consPower != null && build.block.consPower.capacity > 0) {
+            float stored = build.power.status * build.block.consPower.capacity;
+            float capacity = build.block.consPower.capacity;
+            
             String powerBar = makeProgressBar(stored, capacity, 10);
             tooltipTable.add("⚡" + statColor + "Battery: " + accentColor + (int)stored + infoColor + "/" + (int)capacity).left().row();
             if (!compactMode) {
@@ -396,13 +396,13 @@ public class TooltipsPlusMod extends Mod {
     void addItemStorageInfo(Building build) {
         if (build.items == null || build.items.total() == 0) return;
         
-        tooltipTable.add(statColor + "─ Items ─").padTop(4f).row();
+        tooltipTable.add("[" + statColor.replace("[", "").replace("]", "") + "]─ Items ─").padTop(4f).row();
         
         int total = build.items.total();
         int capacity = build.block.itemCapacity;
         float fillPercent = (total / (float)capacity) * 100f;
         
-        tooltipTable.add("📦" + statColor + "Storage: " + getPercentColor(fillPercent) + total + infoColor + "/" + capacity).left().row();
+        tooltipTable.add("📦 [" + statColor.replace("[", "").replace("]", "") + "]Storage: [" + getPercentColor(fillPercent).replace("[", "").replace("]", "") + "]" + total + "[" + infoColor.replace("[", "").replace("]", "") + "]/" + capacity).left().row();
         
         if (!compactMode && fillPercent > 0) {
             String storageBar = makeProgressBar(total, capacity, 10);
@@ -410,15 +410,15 @@ public class TooltipsPlusMod extends Mod {
         }
         
         if (showWarnings && fillPercent > 90f) {
-            tooltipTable.add("  " + warningColor + "⚠ Nearly Full!").left().row();
+            tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]⚠ Nearly Full!").left().row();
         }
         
         int itemCount = 0;
-        for (int i = 0; i < Vars.content.items().size && itemCount < 5; i++) {
+        for (int i = 0; i < Vars.content.items().size && itemCount < 10; i++) {
             var item = Vars.content.item(i);
             int amount = build.items.get(item);
             if (amount > 0) {
-                tooltipTable.add("  " + item.emoji() + " " + infoColor + item.localizedName + ": " + accentColor + amount).left().row();
+                tooltipTable.add("  " + item.emoji() + " [" + infoColor.replace("[", "").replace("]", "") + "]" + item.localizedName + ": [" + accentColor.replace("[", "").replace("]", "") + "]" + amount).left().row();
                 itemCount++;
             }
         }
@@ -466,22 +466,29 @@ public class TooltipsPlusMod extends Mod {
         
         Turret turret = (Turret)build.block;
         
-        tooltipTable.add(statColor + "─ Turret ─").padTop(4f).row();
+        tooltipTable.add("[" + statColor.replace("[", "").replace("]", "") + "]─ Turret ─").padTop(4f).row();
         
-        tooltipTable.add("  " + infoColor + "Range: " + accentColor + (int)(turret.range / 8f) + " tiles").left().row();
+        tooltipTable.add("  [" + infoColor.replace("[", "").replace("]", "") + "]Range: [" + accentColor.replace("[", "").replace("]", "") + "]" + (int)(turret.range / 8f) + " tiles").left().row();
         
         if (turret.reload > 0) {
             float shotsPerMin = (60f / turret.reload) * 60f;
-            tooltipTable.add("  " + infoColor + "Rate: " + accentColor + Strings.autoFixed(shotsPerMin, 1) + "/min").left().row();
+            tooltipTable.add("  [" + infoColor.replace("[", "").replace("]", "") + "]Rate: [" + accentColor.replace("[", "").replace("]", "") + "]" + Strings.autoFixed(shotsPerMin, 1) + "/min").left().row();
         }
         
         if (build instanceof Turret.TurretBuild) {
             Turret.TurretBuild tb = (Turret.TurretBuild)build;
             if (tb.hasAmmo()) {
-                tooltipTable.add("  " + successColor + "✓ Ammo Ready").left().row();
+                tooltipTable.add("  [" + successColor.replace("[", "").replace("]", "") + "]✓ Ammo Ready").left().row();
             } else {
-                tooltipTable.add("  " + warningColor + "✗ No Ammo").left().row();
+                tooltipTable.add("  [" + warningColor.replace("[", "").replace("]", "") + "]✗ No Ammo").left().row();
             }
+        }
+        
+        if (highlightHovered) {
+            Lines.stroke(2f);
+            Draw.color(arc.graphics.Color.cyan, 0.3f);
+            Lines.circle(build.x, build.y, turret.range);
+            Draw.reset();
         }
     }
 
