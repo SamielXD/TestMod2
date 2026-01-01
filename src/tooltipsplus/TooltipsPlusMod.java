@@ -1,11 +1,13 @@
 package tooltipsplus;
 
+import arc.Events;
 import arc.graphics.g2d.*;
 import arc.math.geom.*;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.util.*;
 import mindustry.*;
+import mindustry.game.EventType;
 import mindustry.gen.*;
 import mindustry.mod.*;
 import mindustry.type.*;
@@ -101,12 +103,9 @@ public class TooltipsPlusMod extends Mod {
             tooltipTable.add("[stat]Power: [accent]" + (int)(gen.powerProduction * 60f) + "/s").left().row();
         }
         
-        // Power consumption
-        if (build.block.consumes.hasPower()) {
-            float powerUse = build.block.consumes.getPower().usage * 60f;
-            if (powerUse > 0) {
-                tooltipTable.add("[stat]Power Use: [accent]" + Strings.autoFixed(powerUse, 1) + "/s").left().row();
-            }
+        // Power consumption (check if block consumes power)
+        if (build.block.consumesPower) {
+            tooltipTable.add("[stat]Uses Power").left().row();
         }
         
         // Item capacity
