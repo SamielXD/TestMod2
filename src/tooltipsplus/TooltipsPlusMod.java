@@ -1163,6 +1163,106 @@ public class TooltipsPlusMod extends Mod {
                 String[] fontLabels = {"Small", "Normal", "Large"};
                 table.add("[lightgray]" + fontLabels[fontSize]).colspan(2).left().padTop(-4f).row();
                 
+                table.add("[accent]" + repeat("═", 13) + " Features " + repeat("═", 13)).center().colspan(2).padTop(12f).padBottom(8f).row();
+                
+                table.check("Power Details", showPowerDetails, v -> {
+                    showPowerDetails = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Item Flow Rates", showItemFlow, v -> {
+                    showItemFlow = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Advanced Unit Info", showUnitAdvanced, v -> {
+                    showUnitAdvanced = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Show Warnings", showWarnings, v -> {
+                    showWarnings = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Turret Analytics", showTurretInfo, v -> {
+                    showTurretInfo = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Drill Analytics", showDrillInfo, v -> {
+                    showDrillInfo = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Connection Info", showConnectionInfo, v -> {
+                    showConnectionInfo = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Storage Breakdown", showStorageBreakdown, v -> {
+                    showStorageBreakdown = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Production History", showProductionHistory, v -> {
+                    showProductionHistory = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Repair Indicators", showRepairInfo, v -> {
+                    showRepairInfo = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.check("Team Stats (PvP)", showTeamStats, v -> {
+                    showTeamStats = v;
+                    saveSettings();
+                }).colspan(2).left().row();
+                
+                table.add("[accent]" + repeat("═", 12) + " Presets " + repeat("═", 12)).center().colspan(2).padTop(12f).padBottom(8f).row();
+                
+                Table presetRow1 = new Table();
+                presetRow1.button("Minimal", Icon.zoom, () -> {
+                    applyPreset("minimal");
+                    Vars.ui.showInfo("[lime]Applied Minimal preset");
+                }).size(140f, 50f).pad(4f);
+                
+                presetRow1.button("Balanced", Icon.settings, () -> {
+                    applyPreset("balanced");
+                    Vars.ui.showInfo("[lime]Applied Balanced preset");
+                }).size(140f, 50f).pad(4f);
+                
+                table.add(presetRow1).colspan(2).center().padTop(8f).row();
+                
+                Table presetRow2 = new Table();
+                presetRow2.button("Maximum", Icon.zoom, () -> {
+                    applyPreset("maximum");
+                    Vars.ui.showInfo("[lime]Applied Maximum preset");
+                }).size(140f, 50f).pad(4f);
+                presetRow2.button("Combat", Icon.units, () -> {
+                    applyPreset("combat");
+                    Vars.ui.showInfo("[lime]Applied Combat preset");
+                }).size(140f, 50f).pad(4f);
+                
+                table.add(presetRow2).colspan(2).center().padTop(4f).row();
+                
+                table.add("[accent]" + repeat("═", 15) + " Info " + repeat("═", 15)).center().colspan(2).padTop(12f).padBottom(8f).row();
+                
+                table.add("[lightgray]Health bars, shields, and range\nindicators shown in real-time").colspan(2).center().padTop(8f).row();
+                
+                table.add("[sky]Version 4.0 - Visual Indicators").colspan(2).center().padTop(8f).row();
+                
+                table.button("Reset to Defaults", Icon.refresh, () -> {
+                    resetToDefaults();
+                    Vars.ui.showInfo("[lime]Reset to defaults");
+                }).size(200f, 50f).colspan(2).center().padTop(16f);
+            });
+        } catch (Throwable ex) {
+            Log.err("TooltipsPlus: Failed to add settings UI", ex);
+        }
+    }
+
 
                 
                 table.check("Power Details", showPowerDetails, v -> {
