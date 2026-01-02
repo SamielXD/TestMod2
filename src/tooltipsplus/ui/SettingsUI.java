@@ -59,6 +59,11 @@ public class SettingsUI {
             settings.save();
         }).colspan(2).left().row();
         
+        t.check("Vision Cones (Turrets)", settings.showVisionCones, v -> {
+            settings.showVisionCones = v;
+            settings.save();
+        }).colspan(2).left().row();
+        
         t.check("Effect Ranges", settings.showEffectRanges, v -> {
             settings.showEffectRanges = v;
             settings.save();
@@ -76,6 +81,11 @@ public class SettingsUI {
         
         t.check("Show Team Ranges", settings.showTeamRanges, v -> {
             settings.showTeamRanges = v;
+            settings.save();
+        }).colspan(2).left().row();
+        
+        t.check("Ore Tooltips", settings.showOreTooltips, v -> {
+            settings.showOreTooltips = v;
             settings.save();
         }).colspan(2).left().row();
         
@@ -257,9 +267,9 @@ public class SettingsUI {
         
         t.add("[accent]" + FormatUtil.repeat("═", 15) + " Info " + FormatUtil.repeat("═", 15)).center().colspan(2).padTop(12f).padBottom(8f).row();
         
-        t.add("[lightgray]Health bars, shields, and range\nindicators shown in real-time").colspan(2).center().padTop(8f).row();
+        t.add("[lightgray]Enhanced tooltips with vision cones,\nore detection, and improved visuals").colspan(2).center().padTop(8f).row();
         
-        t.add("[sky]Version 4.0 - Visual Indicators").colspan(2).center().padTop(8f).row();
+        t.add("[sky]Version 5.0 - Vision & Resources").colspan(2).center().padTop(8f).row();
         
         t.button("Reset to Defaults", Icon.refresh, () -> {
             settings.resetToDefaults();
@@ -267,4 +277,4 @@ public class SettingsUI {
             Vars.ui.showInfo("[lime]Reset to defaults");
         }).size(200f, 50f).colspan(2).center().padTop(16f);
     }
-                  }
+}
