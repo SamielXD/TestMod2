@@ -9,6 +9,8 @@ import mindustry.*;
 import mindustry.gen.*;
 import mindustry.ui.*;
 import mindustry.world.*;
+import mindustry.content.Blocks;
+import mindustry.type.Item;
 import tooltipsplus.config.Settings;
 import tooltipsplus.data.*;
 import tooltipsplus.util.*;
@@ -22,6 +24,7 @@ public class TooltipRenderer {
     private Table tooltipTable;
     private Building lastHoveredBuilding;
     private Unit lastHoveredUnit;
+    private Tile lastHoveredTile;
     private float hoverTimer = 0f;
     private Building pinnedBuilding = null;
     private boolean isPinned = false;
@@ -41,9 +44,21 @@ public class TooltipRenderer {
         tooltipTable.margin(6f);
         tooltipTable.visible = false;
         Vars.ui.hudGroup.addChild(tooltipTable);
+        
+        hideVanillaTooltips();
+    }
+    
+    void hideVanillaTooltips() {
+        try {
+            if (Vars.control != null && Vars.control.input != null) {
+                Vars.control.input.selectedBlock = null;
+            }
+        } catch (Exception e) {}
     }
     
     public void update() {
+        hideVanillaTooltips();
+        
         if (!settings.enabled || Vars.state.isMenu()) {
             tooltipTable.visible = false;
             hoverTimer = 0f;
@@ -67,17 +82,18 @@ public class TooltipRenderer {
             return;
         }
         
-        if (hoveredBuilding != lastHoveredBuilding || hoveredUnit != lastHoveredUnit) {
+        if (hoveredBuilding != lastHoveredBuilding || hoveredUnit != lastHoveredUnit || hoverTile != lastHoveredTile) {
             hoverTimer = 0f;
             lastHoveredBuilding = hoveredBuilding;
             lastHoveredUnit = hoveredUnit;
+            lastHoveredTile = hoverTile;
             
-            if (settings.playHoverSound && (hoveredBuilding != null || hoveredUnit != null)) {
+            if (settings.playHoverSound && (hoveredBuilding != null || hoveredUnit != null || (hoverTile != null && isOreOrResource(hoverTile)))) {
                 Sounds.click.play(0.3f);
             }
         }
         
-        if (hoveredBuilding != null || hoveredUnit != null) {
+        if (hoveredBuilding != null || hoveredUnit != null || (hoverTile != null && isOreOrResource(hoverTile))) {
             hoverTimer += Time.delta / 60f;
         }
         
@@ -98,10 +114,70 @@ public class TooltipRenderer {
             } else if (hoveredUnit != null) {
                 showUnitTooltip(hoveredUnit);
                 return;
+            } else if (hoverTile != null && isOreOrResource(hoverTile)) {
+                showOreTooltip(hoverTile);
+                return;
             }
         }
         
         tooltipTable.visible = false;
+    }
+    
+    boolean isOreOrResource(Tile tile) {
+        if (tile == null) return false;
+        return tile.overlay() != Blocks.air && tile.overlay().itemDrop != null;
+    }
+    
+    void showOreTooltip(Tile tile) {
+        if (tile == null || tile.overlay() == null) return;
+        
+        Item drop = tile.overlay().itemDrop;
+        if (drop == null) return;
+        
+        tooltipTable.clear();
+        tooltipTable.visible = true;
+        
+        Table titleRow = new Table();
+        if (settings.showIcons && drop.fullIcon != null) {
+            titleRow.image(drop.fullIcon).size(24f * (settings.fontSize + 1)).padRight(4f);
+        }
+        titleRow.add(colors.accentColor + drop.localizedName).style(Styles.outlineLabel);
+        tooltipTable.add(titleRow).left().row();
+        
+        if (!settings.compactMode) {
+            tooltipTable.add(colors.infoColor + FormatUtil.repeat("─", 20)).padTop(2f).padBottom(2f).row();
+        }
+        
+        tooltipTable.add(colors.statColor + "Type: " + colors.infoColor + "Ore Resource").left().row();
+        
+        if (tile.overlay().name != null) {
+            tooltipTable.add(colors.statColor + "Block: " + colors.infoColor + tile.overlay().localizedName).left().row();
+        }
+        
+        if (drop.hardness > 0) {
+            tooltipTable.add(colors.statColor + "Hardness: " + colors.infoColor + (int)drop.hardness).left().row();
+        }
+        
+        if (drop.cost > 0) {
+            tooltipTable.add(colors.statColor + "Value: " + colors.infoColor + drop.cost).left().row();
+        }
+        
+        if (drop.explosiveness > 0) {
+            tooltipTable.add(colors.warningColor + "⚠ Explosive: " + (int)(drop.explosiveness * 100) + "%").left().row();
+        }
+        
+        if (drop.flammability > 0) {
+            tooltipTable.add(colors.warningColor + "🔥 Flammable: " + (int)(drop.flammability * 100) + "%").left().row();
+        }
+        
+        if (drop.radioactivity > 0) {
+            tooltipTable.add(colors.warningColor + "☢ Radioactive: " + (int)(drop.radioactivity * 100) + "%").left().row();
+        }
+        
+        tooltipTable.add(colors.infoColor + "Position: " + tile.x + ", " + tile.y).left().padTop(4f).row();
+        
+        positionTooltip();
+        tooltipTable.pack();
     }
     
     void showBuildingTooltip(Building build) {
