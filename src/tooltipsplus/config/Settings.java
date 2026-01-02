@@ -44,6 +44,11 @@ public class Settings {
     public float shieldBarHeight = 4f;
     public float hoverDelay = 0.15f;
     
+    public boolean autoHideFullHP = true;
+    public boolean showBossBar = true;
+    public String anchorMode = "follow";
+    public float bossHPThreshold = 5000f;
+
     public void load() {
         enabled = Core.settings.getBool("ttp-enabled", true);
         showPowerDetails = Core.settings.getBool("ttp-power", true);
@@ -82,8 +87,13 @@ public class Settings {
         maxTooltipLines = Core.settings.getInt("ttp-maxlines", 20);
         rangeOpacity = Core.settings.getInt("ttp-rangeopacity", 25) / 100f;
         effectRangeOpacity = Core.settings.getInt("ttp-effectopacity", 15) / 100f;
+        
+        autoHideFullHP = Core.settings.getBool("ttp-autohide", true);
+        showBossBar = Core.settings.getBool("ttp-bossbar", true);
+        anchorMode = Core.settings.getString("ttp-anchor", "follow");
+        bossHPThreshold = Core.settings.getInt("ttp-bossthreshold", 5000);
     }
-    
+
     public void save() {
         Core.settings.put("ttp-enabled", enabled);
         Core.settings.put("ttp-power", showPowerDetails);
@@ -122,9 +132,14 @@ public class Settings {
         Core.settings.put("ttp-maxlines", maxTooltipLines);
         Core.settings.put("ttp-rangeopacity", (int)(rangeOpacity * 100));
         Core.settings.put("ttp-effectopacity", (int)(effectRangeOpacity * 100));
+        
+        Core.settings.put("ttp-autohide", autoHideFullHP);
+        Core.settings.put("ttp-bossbar", showBossBar);
+        Core.settings.put("ttp-anchor", anchorMode);
+        Core.settings.put("ttp-bossthreshold", (int)bossHPThreshold);
         Core.settings.forceSave();
     }
-    
+
     public void applyPreset(String preset) {
         switch(preset) {
             case "minimal":
@@ -162,7 +177,7 @@ public class Settings {
         }
         save();
     }
-    
+
     public void resetToDefaults() {
         enabled = true;
         compactMode = false;
@@ -197,6 +212,10 @@ public class Settings {
         maxTooltipLines = 20;
         rangeOpacity = 0.25f;
         effectRangeOpacity = 0.15f;
+        autoHideFullHP = true;
+        showBossBar = true;
+        anchorMode = "follow";
+        bossHPThreshold = 5000f;
         save();
     }
 }
