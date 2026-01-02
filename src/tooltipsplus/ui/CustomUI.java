@@ -65,6 +65,6 @@ public class CustomUI {
     }
     
     public void drawResourceCounter() {
-        // Coming soon - will show resources like in Helium
+       
     }
 }
