@@ -50,8 +50,8 @@ public class TooltipRenderer {
     
     void hideVanillaTooltips() {
         try {
-            if (Vars.control != null && Vars.control.input != null) {
-                Vars.control.input.selectedBlock = null;
+            if (Vars.ui != null && Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
+                Vars.ui.hudfrag.blockfrag.hide();
             }
         } catch (Exception e) {}
     }
