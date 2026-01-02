@@ -379,7 +379,7 @@ public class TooltipRenderer {
         
         table.add(colors.accentColor + "⚙ Reconstructor Info:").left().row();
         
-        if (reconstructor.upgrades.length > 0) {
+        if (reconstructor.upgrades.size > 0) {
             for (var upgrade : reconstructor.upgrades) {
                 if (upgrade.length >= 2) {
                     table.add(colors.statColor + "  " + upgrade[0].localizedName + " → " + upgrade[1].localizedName).left().row();
@@ -389,9 +389,9 @@ public class TooltipRenderer {
         
         if (build instanceof mindustry.world.blocks.units.Reconstructor.ReconstructorBuild) {
             mindustry.world.blocks.units.Reconstructor.ReconstructorBuild rb = (mindustry.world.blocks.units.Reconstructor.ReconstructorBuild)build;
-            if (rb.currentUnit != null) {
-                table.add(colors.infoColor + "  Current: " + rb.currentUnit.type.localizedName).left().row();
-                float progress = rb.progress * 100f;
+            if (rb.unit() != null) {
+                table.add(colors.infoColor + "  Current: " + rb.unit().type.localizedName).left().row();
+                float progress = rb.progress() * 100f;
                 table.add(colors.infoColor + "  Progress: " + (int)progress + "%").left().row();
             }
         }
