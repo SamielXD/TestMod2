@@ -30,10 +30,6 @@ public class VisualIndicators {
     public void update() {
         animationTimer += Time.delta / 60f;
         
-        if (settings.showHealthBars) {
-            drawHealthIndicators();
-        }
-        
         if (settings.showRangeIndicators) {
             updateRangeCache();
             drawRangeIndicators();
@@ -46,62 +42,6 @@ public class VisualIndicators {
         if (settings.showVisionCones) {
             drawTurretVisionCones();
         }
-    }
-    
-    void drawHealthIndicators() {
-        Groups.unit.each(unit -> {
-            if (!unit.isValid() || unit.dead || unit.health <= 0) return;
-            
-            float x = unit.x;
-            float y = unit.y + unit.hitSize / 2f + Constants.HEALTH_BAR_OFFSET;
-            
-            drawHealthBar(x, y, unit.health, unit.maxHealth, unit.hitSize * 0.8f);
-            
-            if (settings.showShieldStacks && unit.shield > 0) {
-                float shieldY = y + Constants.SHIELD_BAR_OFFSET - Constants.HEALTH_BAR_OFFSET;
-                drawShieldBar(x, shieldY, unit.shield, unit.maxHealth, unit.hitSize * 0.8f);
-                
-                if (unit.shield > unit.maxHealth) {
-                    int stacks = (int)(unit.shield / unit.maxHealth);
-                    Fonts.outline.draw("x" + stacks, x + unit.hitSize * 0.5f, shieldY + 2f, Color.white, 0.5f, false, Align.left);
-                }
-            }
-        });
-        
-        Groups.build.each(build -> {
-            if (!build.isValid() || build.dead || build.health <= 0) return;
-            
-            float x = build.x;
-            float y = build.y + build.block.size * 4f + Constants.HEALTH_BAR_OFFSET;
-            float width = build.block.size * 7f;
-            
-            drawHealthBar(x, y, build.health, build.maxHealth, width);
-        });
-    }
-    
-    void drawHealthBar(float x, float y, float health, float maxHealth, float width) {
-        float percent = Math.min(health / maxHealth, 1f);
-        
-        Draw.color(Color.black, 0.5f);
-        Fill.rect(x, y, width + 2f, settings.healthBarHeight + 2f);
-        
-        Color barColor = percent > 0.6f ? Constants.HEALTH_COLOR : percent > 0.3f ? Color.yellow : Constants.DAMAGE_COLOR;
-        Draw.color(barColor);
-        Fill.rect(x - width / 2f + (width * percent) / 2f, y, width * percent, settings.healthBarHeight);
-        
-        Draw.reset();
-    }
-    
-    void drawShieldBar(float x, float y, float shield, float maxHealth, float width) {
-        float percent = Math.min(shield / maxHealth, 1f);
-        
-        Draw.color(Color.black, 0.5f);
-        Fill.rect(x, y, width + 2f, settings.shieldBarHeight + 2f);
-        
-        Draw.color(Constants.SHIELD_COLOR, 0.8f);
-        Fill.rect(x - width / 2f + (width * percent) / 2f, y, width * percent, settings.shieldBarHeight);
-        
-        Draw.reset();
     }
     
     void updateRangeCache() {
