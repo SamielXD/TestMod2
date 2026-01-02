@@ -4,8 +4,10 @@ import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.struct.Seq;
 import arc.util.Time;
+import arc.util.Align;
 import mindustry.Vars;
 import mindustry.gen.Groups;
+import mindustry.ui.Fonts;
 import mindustry.world.blocks.defense.turrets.Turret;
 import mindustry.world.blocks.units.*;
 import tooltipsplus.config.*;
@@ -53,7 +55,7 @@ public class VisualIndicators {
                 
                 if (unit.shield > unit.maxHealth) {
                     int stacks = (int)(unit.shield / unit.maxHealth);
-                    Fonts.outline.draw("x" + stacks, x + unit.hitSize * 0.5f, shieldY + 2f, Color.white, 0.5f, false, arc.util.Align.left);
+                    Fonts.outline.draw("x" + stacks, x + unit.hitSize * 0.5f, shieldY + 2f, Color.white, 0.5f, false, Align.left);
                 }
             }
         });
@@ -187,4 +189,4 @@ public class VisualIndicators {
             }
         });
     }
-    }
+}
