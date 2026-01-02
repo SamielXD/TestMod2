@@ -169,7 +169,7 @@ public class HealthDisplaySystem {
     Color getTeamColor(Team team) {
         if (team == Vars.player.team()) {
             return Color.valueOf("84f491");
-        } else if (team.allied(Vars.player.team())) {
+        } else if (team.id == Vars.player.team().id) {
             return Color.sky;
         } else {
             return Color.valueOf("ff6b6b");
