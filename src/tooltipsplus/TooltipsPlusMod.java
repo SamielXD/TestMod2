@@ -238,13 +238,7 @@ public class TooltipsPlusMod extends Mod {
             sb.append(str);
         }
         return sb.toString();
-    }
-    
-    // Continued in Part 2...
-}// Part 2/6 - Setup and Visual Systems
-// Add to TooltipsPlusMod class after Part 1
-
-void setupHotkeys() {
+    }void setupHotkeys() {
     Events.run(EventType.Trigger.update, () -> {
         if (arc.Core.input.keyTap(arc.input.KeyCode.t)) {
             enabled = !enabled;
@@ -451,12 +445,7 @@ void updateProductionTracking() {
         productionHistory[historyIndex] = status;
         historyIndex = (historyIndex + 1) % 60;
     }
-}
-
-// Continued in Part 3...// Part 3/6 - Tooltip System
-// Add to TooltipsPlusMod class after Part 2
-
-void setupTooltipSystem() {
+}void setupTooltipSystem() {
     tooltipTable = new Table(Styles.black);
     tooltipTable.background(Tex.buttonEdge3);
     tooltipTable.margin(6f);
@@ -542,13 +531,8 @@ void showBuildingTooltip(Building build) {
     
     float healthPercent = (build.health / build.maxHealth) * 100f;
     String healthColor = getPercentColor(healthPercent);
-    String healthBar = makeProgressBar(build.health, build.maxHealth, 10);
     
     tooltipTable.add("🛡 " + statColor + "HP: " + healthColor + (int)build.health + infoColor + "/" + (int)build.maxHealth).left().row();
-    
-    if (!compactMode && healthPercent < 100f) {
-        tooltipTable.add("  " + healthBar).left().row();
-    }
     
     if (showWarnings && healthPercent < 30f) {
         tooltipTable.add("  " + warningColor + "⚠ Critical Damage!").left().row();
@@ -622,10 +606,6 @@ void showUnitTooltip(Unit unit) {
     
     if (showShieldStacks && unit.shield > 0) {
         tooltipTable.add("🛡" + statColor + "Shield: " + successColor + (int)unit.shield).left().row();
-        if (unit.shield > unit.maxHealth) {
-            int stacks = (int)(unit.shield / unit.maxHealth);
-            tooltipTable.add("  " + infoColor + "Multi-layer (x" + stacks + ")").left().row();
-        }
     }
     
     if (unit.type.armor > 0) {
@@ -637,8 +617,7 @@ void showUnitTooltip(Unit unit) {
     }
     
     if (showUnitAdvanced) {
-        String moveIcon = unit.type.flying ? "✈" : "⛏";
-        tooltipTable.add(moveIcon + statColor + "Speed: " + accentColor + Strings.autoFixed(unit.type.speed * 60f, 1)).left().row();
+        tooltipTable.add("✈" + statColor + "Speed: " + accentColor + Strings.autoFixed(unit.type.speed * 60f, 1)).left().row();
         
         if (unit.type.mineSpeed > 0) {
             tooltipTable.add("⛏" + statColor + "Mine: " + accentColor + Strings.autoFixed(unit.type.mineSpeed, 1) + "/s").left().row();
@@ -650,8 +629,7 @@ void showUnitTooltip(Unit unit) {
         
         if (unit.type.itemCapacity > 0) {
             int carrying = unit.stack != null && unit.stack.item != null ? unit.stack.amount : 0;
-            String carryColor = carrying > 0 ? accentColor : infoColor;
-            tooltipTable.add("📦" + statColor + "Carry: " + carryColor + carrying + infoColor + "/" + unit.type.itemCapacity).left().row();
+            tooltipTable.add("📦" + statColor + "Carry: " + accentColor + carrying + infoColor + "/" + unit.type.itemCapacity).left().row();
         }
     }
     
@@ -695,12 +673,7 @@ void positionTooltip() {
     }
     
     tooltipTable.color.a = tooltipOpacity / 10f;
-}
-
-// Continued in Part 4...// Part 4/6 - Tooltip Details
-// Add to TooltipsPlusMod class after Part 3
-
-void addPowerInfo(Building build) {
+}void addPowerInfo(Building build) {
     if (build.power == null) return;
     
     tooltipTable.add(statColor + "─ Power ─").padTop(4f).row();
@@ -709,11 +682,7 @@ void addPowerInfo(Building build) {
         float stored = build.power.status * build.block.consPower.capacity;
         float capacity = build.block.consPower.capacity;
         
-        String powerBar = makeProgressBar(stored, capacity, 10);
         tooltipTable.add("⚡" + statColor + "Battery: " + accentColor + (int)stored + infoColor + "/" + (int)capacity).left().row();
-        if (!compactMode) {
-            tooltipTable.add("  " + powerBar).left().row();
-        }
     }
     
     if (build.block instanceof PowerGenerator) {
@@ -738,11 +707,6 @@ void addItemStorageInfo(Building build) {
     float fillPercent = (total / (float)capacity) * 100f;
     
     tooltipTable.add("📦 " + statColor + "Storage: " + getPercentColor(fillPercent) + total + infoColor + "/" + capacity).left().row();
-    
-    if (!compactMode && fillPercent > 0) {
-        String storageBar = makeProgressBar(total, capacity, 10);
-        tooltipTable.add("  " + storageBar).left().row();
-    }
     
     if (showWarnings && fillPercent > 90f) {
         tooltipTable.add("  " + warningColor + "⚠ Nearly Full!").left().row();
@@ -769,11 +733,6 @@ void addLiquidInfo(Building build) {
     float fillPercent = (total / capacity) * 100f;
     
     tooltipTable.add("💧" + statColor + "Tank: " + getPercentColor(fillPercent) + Strings.autoFixed(total, 1) + infoColor + "/" + Strings.autoFixed(capacity, 1)).left().row();
-    
-    if (!compactMode) {
-        String liquidBar = makeProgressBar(total, capacity, 10);
-        tooltipTable.add("  " + liquidBar).left().row();
-    }
 }
 
 void addProductionInfo(Building build) {
@@ -930,12 +889,7 @@ String makeProgressBar(float current, float max, int width) {
     }
     bar.append("]");
     return bar.toString();
-}
-
-// Continued in Part 5...// Part 5/6 - Settings UI (Part 1)
-// Add to TooltipsPlusMod class after Part 4
-
-void addSettingsUI() {
+}void addSettingsUI() {
     try {
         Vars.ui.settings.addCategory("Tooltips+", Icon.book, t -> {
             t.defaults().left().padTop(4f);
@@ -1129,12 +1083,7 @@ void addSettingsUI() {
     } catch (Throwable ex) {
         Log.err("TooltipsPlus: Failed to add settings UI", ex);
     }
-}
-
-// Continued in Part 6...// Part 6/6 - Settings UI (Part 2) & Presets
-// Add to TooltipsPlusMod class after Part 5
-
-void addPresetsAndInfo(Table t) {
+}void addPresetsAndInfo(Table t) {
     t.add("[accent]" + repeat("═", 12) + " Presets " + repeat("═", 12)).center().colspan(2).padTop(12f).padBottom(8f).row();
     
     Table presetRow1 = new Table();
@@ -1338,5 +1287,4 @@ void resetToDefaults() {
     saveSettings();
 }
 
-// End of TooltipsPlusMod class
 }
