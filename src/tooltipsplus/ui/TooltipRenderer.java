@@ -273,6 +273,14 @@ public class TooltipRenderer {
             buildingData.addDrillInfo(tooltipTable, build);
         }
         
+        if (build.block instanceof mindustry.world.blocks.units.Reconstructor) {
+            addReconstructorInfo(tooltipTable, build);
+        }
+        
+        if (build.block instanceof mindustry.world.blocks.units.UnitFactory) {
+            addUnitFactoryInfo(tooltipTable, build);
+        }
+        
         if (settings.showConnectionInfo) {
             buildingData.addConnectionInfo(tooltipTable, build);
         }
@@ -362,5 +370,55 @@ public class TooltipRenderer {
     
     public Building getLastHoveredBuilding() {
         return lastHoveredBuilding;
+    }
+    
+    void addReconstructorInfo(Table table, Building build) {
+        if (!(build.block instanceof mindustry.world.blocks.units.Reconstructor)) return;
+        
+        mindustry.world.blocks.units.Reconstructor reconstructor = (mindustry.world.blocks.units.Reconstructor)build.block;
+        
+        table.add(colors.accentColor + "⚙ Reconstructor Info:").left().row();
+        
+        if (reconstructor.upgrades.length > 0) {
+            for (var upgrade : reconstructor.upgrades) {
+                if (upgrade.length >= 2) {
+                    table.add(colors.statColor + "  " + upgrade[0].localizedName + " → " + upgrade[1].localizedName).left().row();
+                }
+            }
+        }
+        
+        if (build instanceof mindustry.world.blocks.units.Reconstructor.ReconstructorBuild) {
+            mindustry.world.blocks.units.Reconstructor.ReconstructorBuild rb = (mindustry.world.blocks.units.Reconstructor.ReconstructorBuild)build;
+            if (rb.currentUnit != null) {
+                table.add(colors.infoColor + "  Current: " + rb.currentUnit.type.localizedName).left().row();
+                float progress = rb.progress * 100f;
+                table.add(colors.infoColor + "  Progress: " + (int)progress + "%").left().row();
+            }
+        }
+    }
+    
+    void addUnitFactoryInfo(Table table, Building build) {
+        if (!(build.block instanceof mindustry.world.blocks.units.UnitFactory)) return;
+        
+        mindustry.world.blocks.units.UnitFactory factory = (mindustry.world.blocks.units.UnitFactory)build.block;
+        
+        table.add(colors.accentColor + "🏭 Factory Info:").left().row();
+        
+        if (factory.plans.size > 0) {
+            table.add(colors.statColor + "  Can produce:").left().row();
+            for (var plan : factory.plans) {
+                table.add(colors.infoColor + "    • " + plan.unit.localizedName).left().row();
+            }
+        }
+        
+        if (build instanceof mindustry.world.blocks.units.UnitFactory.UnitFactoryBuild) {
+            mindustry.world.blocks.units.UnitFactory.UnitFactoryBuild fb = (mindustry.world.blocks.units.UnitFactory.UnitFactoryBuild)build;
+            if (fb.currentPlan >= 0 && fb.currentPlan < factory.plans.size) {
+                var plan = factory.plans.get(fb.currentPlan);
+                table.add(colors.infoColor + "  Building: " + plan.unit.localizedName).left().row();
+                float progress = fb.progress * 100f;
+                table.add(colors.infoColor + "  Progress: " + (int)progress + "%").left().row();
+            }
+        }
     }
 }
