@@ -26,6 +26,7 @@ public class Settings {
     public boolean showVisionCones = true;
     public boolean showOreTooltips = true;
     public boolean showStatusEffects = true;
+    public boolean showDamageNumbers = true;
     public boolean showAllDamageNumbers = false;
     public float healthBarScale = 0.8f;
     public float damageNumberScale = 0.7f;
@@ -67,6 +68,7 @@ public class Settings {
         showVisionCones = Core.settings.getBool("ttp-visioncones", true);
         showOreTooltips = Core.settings.getBool("ttp-oretooltips", true);
         showStatusEffects = Core.settings.getBool("ttp-statuseffects", true);
+        showDamageNumbers = Core.settings.getBool("ttp-damagenumbers", true);
         showAllDamageNumbers = Core.settings.getBool("ttp-alldamage", false);
         healthBarScale = Core.settings.getInt("ttp-healthscale", 80) / 100f;
         damageNumberScale = Core.settings.getInt("ttp-damagescale", 70) / 100f;
@@ -106,6 +108,7 @@ public class Settings {
         Core.settings.put("ttp-visioncones", showVisionCones);
         Core.settings.put("ttp-oretooltips", showOreTooltips);
         Core.settings.put("ttp-statuseffects", showStatusEffects);
+        Core.settings.put("ttp-damagenumbers", showDamageNumbers);
         Core.settings.put("ttp-alldamage", showAllDamageNumbers);
         Core.settings.put("ttp-healthscale", (int)(healthBarScale * 100));
         Core.settings.put("ttp-damagescale", (int)(damageNumberScale * 100));
