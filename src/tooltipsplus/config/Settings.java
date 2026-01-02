@@ -23,6 +23,8 @@ public class Settings {
     public boolean animateRanges = true;
     public boolean showTeamRanges = true;
     public boolean showUnitRanges = true;
+    public boolean showVisionCones = true;
+    public boolean showOreTooltips = true;
     public int tooltipOpacity = 8;
     public boolean followCursor = true;
     public boolean showIcons = true;
@@ -58,6 +60,8 @@ public class Settings {
         animateRanges = Core.settings.getBool("ttp-animate", true);
         showTeamRanges = Core.settings.getBool("ttp-teamrange", true);
         showUnitRanges = Core.settings.getBool("ttp-unitrange", true);
+        showVisionCones = Core.settings.getBool("ttp-visioncones", true);
+        showOreTooltips = Core.settings.getBool("ttp-oretooltips", true);
         tooltipOpacity = Core.settings.getInt("ttp-opacity", 8);
         followCursor = Core.settings.getBool("ttp-follow", true);
         showIcons = Core.settings.getBool("ttp-icons", true);
@@ -91,6 +95,8 @@ public class Settings {
         Core.settings.put("ttp-animate", animateRanges);
         Core.settings.put("ttp-teamrange", showTeamRanges);
         Core.settings.put("ttp-unitrange", showUnitRanges);
+        Core.settings.put("ttp-visioncones", showVisionCones);
+        Core.settings.put("ttp-oretooltips", showOreTooltips);
         Core.settings.put("ttp-opacity", tooltipOpacity);
         Core.settings.put("ttp-follow", followCursor);
         Core.settings.put("ttp-icons", showIcons);
@@ -111,12 +117,14 @@ public class Settings {
                 showPowerDetails = false;
                 showItemFlow = false;
                 showRangeIndicators = false;
+                showVisionCones = false;
                 tooltipOpacity = 6;
                 break;
             case "balanced":
                 compactMode = false;
                 showPowerDetails = true;
                 showRangeIndicators = true;
+                showVisionCones = true;
                 tooltipOpacity = 8;
                 break;
             case "maximum":
@@ -124,6 +132,8 @@ public class Settings {
                 showPowerDetails = true;
                 showProductionHistory = true;
                 showRangeIndicators = true;
+                showVisionCones = true;
+                showOreTooltips = true;
                 tooltipOpacity = 9;
                 break;
             case "combat":
@@ -131,6 +141,7 @@ public class Settings {
                 showTurretInfo = true;
                 showRangeIndicators = true;
                 showTeamRanges = true;
+                showVisionCones = true;
                 colorTheme = "neon";
                 break;
         }
@@ -159,6 +170,8 @@ public class Settings {
         animateRanges = true;
         showUnitRanges = true;
         showTeamRanges = false;
+        showVisionCones = true;
+        showOreTooltips = true;
         tooltipOpacity = 8;
         followCursor = true;
         hoverDelay = 0.15f;
@@ -171,4 +184,4 @@ public class Settings {
         effectRangeOpacity = 0.15f;
         save();
     }
-  }
+}
