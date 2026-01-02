@@ -44,20 +44,10 @@ public class TooltipRenderer {
         tooltipTable.margin(6f);
         tooltipTable.visible = false;
         Vars.ui.hudGroup.addChild(tooltipTable);
-        
-        hideVanillaTooltips();
-    }
-    
-    void hideVanillaTooltips() {
-        try {
-            if (Vars.ui != null && Vars.ui.hudfrag != null && Vars.ui.hudfrag.blockfrag != null) {
-                Vars.ui.hudfrag.blockfrag.hide();
-            }
-        } catch (Exception e) {}
+        tooltipTable.toFront();
     }
     
     public void update() {
-        hideVanillaTooltips();
         
         if (!settings.enabled || Vars.state.isMenu()) {
             tooltipTable.visible = false;
