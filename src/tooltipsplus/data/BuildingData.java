@@ -4,6 +4,7 @@ import arc.scene.ui.layout.Table;
 import arc.util.Strings;
 import mindustry.Vars;
 import mindustry.world.Building;
+import mindustry.world.Tile;
 import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.blocks.distribution.*;
@@ -138,7 +139,7 @@ public class BuildingData {
             table.add("  " + colors.infoColor + "Speed: " + colors.accentColor + Strings.autoFixed(rate, 1) + "/s").left().row();
         }
         
-        var tile = build.tile;
+        Tile tile = build.tile;
         if (tile != null && tile.drop() != null) {
             table.add("  ⛏ " + tile.drop().emoji() + " " + colors.infoColor + tile.drop().localizedName).left().row();
         }
