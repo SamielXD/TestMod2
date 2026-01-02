@@ -117,7 +117,7 @@ public class TooltipRenderer {
         if (tile == null) return false;
         if (tile.overlay() != Blocks.air && tile.overlay().itemDrop != null) return true;
         if (tile.floor() != Blocks.air && tile.floor().liquidDrop != null) return true;
-        if (tile.block() != Blocks.air && !tile.block().synthetic) return true;
+        if (tile.block() != Blocks.air) return true;
         return false;
     }
     
