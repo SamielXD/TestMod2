@@ -390,7 +390,7 @@ public class TooltipRenderer {
         if (build instanceof mindustry.world.blocks.units.Reconstructor.ReconstructorBuild) {
             mindustry.world.blocks.units.Reconstructor.ReconstructorBuild rb = (mindustry.world.blocks.units.Reconstructor.ReconstructorBuild)build;
             if (rb.unit() != null) {
-                table.add(colors.infoColor + "  Current: " + rb.unit().type.localizedName).left().row();
+                table.add(colors.infoColor + "  Current: " + rb.unit().localizedName).left().row();
                 float progress = rb.progress() * 100f;
                 table.add(colors.infoColor + "  Progress: " + (int)progress + "%").left().row();
             }
