@@ -25,6 +25,7 @@ public class Settings {
     public boolean showUnitRanges = true;
     public boolean showVisionCones = true;
     public boolean showOreTooltips = true;
+    public float healthBarScale = 1f;
     public int tooltipOpacity = 8;
     public boolean followCursor = true;
     public boolean showIcons = true;
@@ -62,6 +63,7 @@ public class Settings {
         showUnitRanges = Core.settings.getBool("ttp-unitrange", true);
         showVisionCones = Core.settings.getBool("ttp-visioncones", true);
         showOreTooltips = Core.settings.getBool("ttp-oretooltips", true);
+        healthBarScale = Core.settings.getInt("ttp-healthscale", 100) / 100f;
         tooltipOpacity = Core.settings.getInt("ttp-opacity", 8);
         followCursor = Core.settings.getBool("ttp-follow", true);
         showIcons = Core.settings.getBool("ttp-icons", true);
@@ -97,6 +99,7 @@ public class Settings {
         Core.settings.put("ttp-unitrange", showUnitRanges);
         Core.settings.put("ttp-visioncones", showVisionCones);
         Core.settings.put("ttp-oretooltips", showOreTooltips);
+        Core.settings.put("ttp-healthscale", (int)(healthBarScale * 100));
         Core.settings.put("ttp-opacity", tooltipOpacity);
         Core.settings.put("ttp-follow", followCursor);
         Core.settings.put("ttp-icons", showIcons);
