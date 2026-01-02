@@ -42,7 +42,7 @@ public class VisualIndicators {
     
     void drawHealthIndicators() {
         Groups.unit.each(unit -> {
-            if (!unit.isValid() || unit.dead) return;
+            if (!unit.isValid() || unit.dead || unit.health <= 0) return;
             
             float x = unit.x;
             float y = unit.y + unit.hitSize / 2f + Constants.HEALTH_BAR_OFFSET;
@@ -61,7 +61,7 @@ public class VisualIndicators {
         });
         
         Groups.build.each(build -> {
-            if (!build.isValid() || build.dead) return;
+            if (!build.isValid() || build.dead || build.health <= 0) return;
             
             float x = build.x;
             float y = build.y + build.block.size * 4f + Constants.HEALTH_BAR_OFFSET;
@@ -105,7 +105,7 @@ public class VisualIndicators {
         
         if (settings.showUnitRanges) {
             Groups.unit.each(unit -> {
-                if (!unit.isValid() || unit.dead || unit.type.weapons.size == 0) return;
+                if (!unit.isValid() || unit.dead || unit.health <= 0 || unit.type.weapons.size == 0) return;
                 if (unit.team != Vars.player.team() && !settings.showTeamRanges) return;
                 
                 float maxRange = 0f;
@@ -126,7 +126,7 @@ public class VisualIndicators {
         }
         
         Groups.build.each(build -> {
-            if (!build.isValid() || build.dead) return;
+            if (!build.isValid() || build.dead || build.health <= 0) return;
             if (build.team != Vars.player.team() && !settings.showTeamRanges) return;
             
             if (build.block instanceof Turret) {
@@ -156,7 +156,7 @@ public class VisualIndicators {
     
     void drawEffectRanges() {
         Groups.build.each(build -> {
-            if (!build.isValid() || build.dead) return;
+            if (!build.isValid() || build.dead || build.health <= 0) return;
             if (build.team != Vars.player.team()) return;
             
             Color effectColor = null;
