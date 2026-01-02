@@ -363,8 +363,11 @@ public class TooltipsPlusMod extends Mod {
                 
                 float maxRange = 0f;
                 for (var weapon : unit.type.weapons) {
-                    if (weapon.bullet != null && weapon.bullet.range() > maxRange) {
-                        maxRange = weapon.bullet.range();
+                    if (weapon.bullet != null) {
+                        float weaponRange = weapon.bullet.rangeChange + weapon.bullet.speed * weapon.bullet.lifetime;
+                        if (weaponRange > maxRange) {
+                            maxRange = weaponRange;
+                        }
                     }
                 }
                 
@@ -388,7 +391,7 @@ public class TooltipsPlusMod extends Mod {
     }
 
     void drawRangeIndicators() {
-        float pulseScale = animateRanges ? 1f + Mathf.sin(animationTimer * 2f) * 0.05f : 1f;
+        float pulseScale = animateRanges ? 1f + arc.math.Mathf.sin(animationTimer * 2f) * 0.05f : 1f;
         
         for (RangeData range : rangeCache) {
             float drawRange = range.isPulsing ? range.range * pulseScale : range.range;
@@ -1005,14 +1008,11 @@ public class TooltipsPlusMod extends Mod {
         return warningColor;
     }
 
-    String makeProgressBar(float current, float max, int width) {
-        int filled = (int)((current / max) * width);
-        StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < width; i++) {
-            bar.append(i < filled ? "█" : "░");
-        }
-        bar.append("]");
-        return bar.toString();
+    String getPercentColor(float percent) {
+        if (percent > 75f) return successColor;
+        if (percent > 50f) return "[yellow]";
+        if (percent > 25f) return "[orange]";
+        return warningColor;
     }
 
     String makeProgressBar(float current, float max, int width) {
