@@ -3,7 +3,7 @@ package tooltipsplus.data;
 import arc.scene.ui.layout.Table;
 import arc.util.Strings;
 import mindustry.Vars;
-import mindustry.world.Building;
+import mindustry.gen.Building;
 import mindustry.world.Tile;
 import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
