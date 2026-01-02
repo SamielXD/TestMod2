@@ -115,53 +115,108 @@ public class TooltipRenderer {
     
     boolean isOreOrResource(Tile tile) {
         if (tile == null) return false;
-        return tile.overlay() != Blocks.air && tile.overlay().itemDrop != null;
+        if (tile.overlay() != Blocks.air && tile.overlay().itemDrop != null) return true;
+        if (tile.floor() != Blocks.air && tile.floor().liquidDrop != null) return true;
+        if (tile.block() != Blocks.air && !tile.block().synthetic) return true;
+        return false;
     }
     
     void showOreTooltip(Tile tile) {
-        if (tile == null || tile.overlay() == null) return;
-        
-        Item drop = tile.overlay().itemDrop;
-        if (drop == null) return;
+        if (tile == null) return;
         
         tooltipTable.clear();
         tooltipTable.visible = true;
         
-        Table titleRow = new Table();
-        if (settings.showIcons && drop.fullIcon != null) {
-            titleRow.image(drop.fullIcon).size(24f * (settings.fontSize + 1)).padRight(4f);
-        }
-        titleRow.add(colors.accentColor + drop.localizedName).style(Styles.outlineLabel);
-        tooltipTable.add(titleRow).left().row();
+        Item drop = null;
+        mindustry.type.Liquid liquidDrop = null;
         
-        if (!settings.compactMode) {
-            tooltipTable.add(colors.infoColor + FormatUtil.repeat("─", 20)).padTop(2f).padBottom(2f).row();
+        if (tile.overlay() != null && tile.overlay().itemDrop != null) {
+            drop = tile.overlay().itemDrop;
+        } else if (tile.floor() != null && tile.floor().liquidDrop != null) {
+            liquidDrop = tile.floor().liquidDrop;
         }
         
-        tooltipTable.add(colors.statColor + "Type: " + colors.infoColor + "Ore Resource").left().row();
-        
-        if (tile.overlay().name != null) {
-            tooltipTable.add(colors.statColor + "Block: " + colors.infoColor + tile.overlay().localizedName).left().row();
-        }
-        
-        if (drop.hardness > 0) {
-            tooltipTable.add(colors.statColor + "Hardness: " + colors.infoColor + (int)drop.hardness).left().row();
-        }
-        
-        if (drop.cost > 0) {
-            tooltipTable.add(colors.statColor + "Value: " + colors.infoColor + drop.cost).left().row();
-        }
-        
-        if (drop.explosiveness > 0) {
-            tooltipTable.add(colors.warningColor + "⚠ Explosive: " + (int)(drop.explosiveness * 100) + "%").left().row();
-        }
-        
-        if (drop.flammability > 0) {
-            tooltipTable.add(colors.warningColor + "🔥 Flammable: " + (int)(drop.flammability * 100) + "%").left().row();
-        }
-        
-        if (drop.radioactivity > 0) {
-            tooltipTable.add(colors.warningColor + "☢ Radioactive: " + (int)(drop.radioactivity * 100) + "%").left().row();
+        if (drop != null) {
+            Table titleRow = new Table();
+            if (settings.showIcons && drop.fullIcon != null) {
+                titleRow.image(drop.fullIcon).size(24f * (settings.fontSize + 1)).padRight(4f);
+            }
+            titleRow.add(colors.accentColor + drop.localizedName).style(Styles.outlineLabel);
+            tooltipTable.add(titleRow).left().row();
+            
+            if (!settings.compactMode) {
+                tooltipTable.add(colors.infoColor + FormatUtil.repeat("─", 20)).padTop(2f).padBottom(2f).row();
+            }
+            
+            tooltipTable.add(colors.statColor + "Type: " + colors.infoColor + "Ore Resource").left().row();
+            
+            if (tile.overlay().name != null) {
+                tooltipTable.add(colors.statColor + "Block: " + colors.infoColor + tile.overlay().localizedName).left().row();
+            }
+            
+            if (drop.hardness > 0) {
+                tooltipTable.add(colors.statColor + "Hardness: " + colors.infoColor + (int)drop.hardness).left().row();
+            }
+            
+            if (drop.cost > 0) {
+                tooltipTable.add(colors.statColor + "Value: " + colors.infoColor + drop.cost).left().row();
+            }
+            
+            if (drop.explosiveness > 0) {
+                tooltipTable.add(colors.warningColor + "⚠ Explosive: " + (int)(drop.explosiveness * 100) + "%").left().row();
+            }
+            
+            if (drop.flammability > 0) {
+                tooltipTable.add(colors.warningColor + "🔥 Flammable: " + (int)(drop.flammability * 100) + "%").left().row();
+            }
+            
+            if (drop.radioactivity > 0) {
+                tooltipTable.add(colors.warningColor + "☢ Radioactive: " + (int)(drop.radioactivity * 100) + "%").left().row();
+            }
+        } else if (liquidDrop != null) {
+            Table titleRow = new Table();
+            if (settings.showIcons && liquidDrop.fullIcon != null) {
+                titleRow.image(liquidDrop.fullIcon).size(24f * (settings.fontSize + 1)).padRight(4f);
+            }
+            titleRow.add(colors.accentColor + liquidDrop.localizedName).style(Styles.outlineLabel);
+            tooltipTable.add(titleRow).left().row();
+            
+            if (!settings.compactMode) {
+                tooltipTable.add(colors.infoColor + FormatUtil.repeat("─", 20)).padTop(2f).padBottom(2f).row();
+            }
+            
+            tooltipTable.add(colors.statColor + "Type: " + colors.infoColor + "Liquid Pool").left().row();
+            
+            if (tile.floor().name != null) {
+                tooltipTable.add(colors.statColor + "Block: " + colors.infoColor + tile.floor().localizedName).left().row();
+            }
+            
+            tooltipTable.add(colors.statColor + "Temperature: " + colors.infoColor + (int)(liquidDrop.temperature * 100) + "°C").left().row();
+            
+            if (liquidDrop.viscosity > 0) {
+                tooltipTable.add(colors.statColor + "Viscosity: " + colors.infoColor + String.format("%.2f", liquidDrop.viscosity)).left().row();
+            }
+            
+            if (liquidDrop.flammability > 0) {
+                tooltipTable.add(colors.warningColor + "🔥 Flammable: " + (int)(liquidDrop.flammability * 100) + "%").left().row();
+            }
+            
+            if (liquidDrop.explosiveness > 0) {
+                tooltipTable.add(colors.warningColor + "⚠ Explosive: " + (int)(liquidDrop.explosiveness * 100) + "%").left().row();
+            }
+        } else if (tile.block() != Blocks.air) {
+            Table titleRow = new Table();
+            if (settings.showIcons && tile.block().fullIcon != null) {
+                titleRow.image(tile.block().fullIcon).size(24f * (settings.fontSize + 1)).padRight(4f);
+            }
+            titleRow.add(colors.accentColor + tile.block().localizedName).style(Styles.outlineLabel);
+            tooltipTable.add(titleRow).left().row();
+            
+            if (!settings.compactMode) {
+                tooltipTable.add(colors.infoColor + FormatUtil.repeat("─", 20)).padTop(2f).padBottom(2f).row();
+            }
+            
+            tooltipTable.add(colors.statColor + "Type: " + colors.infoColor + "Environment Block").left().row();
         }
         
         tooltipTable.add(colors.infoColor + "Position: " + tile.x + ", " + tile.y).left().padTop(4f).row();
