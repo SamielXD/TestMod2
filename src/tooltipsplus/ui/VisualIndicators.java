@@ -5,6 +5,7 @@ import arc.graphics.g2d.*;
 import arc.struct.Seq;
 import arc.util.Time;
 import arc.util.Align;
+import arc.math.Mathf;
 import mindustry.Vars;
 import mindustry.gen.Groups;
 import mindustry.ui.Fonts;
@@ -18,6 +19,9 @@ public class VisualIndicators {
     private Seq<RangeData> rangeCache = new Seq<>();
     private float rangeCacheTimer = 0f;
     private float animationTimer = 0f;
+    
+    private static final float VISION_CONE_ANGLE = 60f;
+    private static final int VISION_CONE_SEGMENTS = 20;
     
     public VisualIndicators(Settings settings) {
         this.settings = settings;
@@ -37,6 +41,10 @@ public class VisualIndicators {
         
         if (settings.showEffectRanges) {
             drawEffectRanges();
+        }
+        
+        if (settings.showVisionCones) {
+            drawTurretVisionCones();
         }
     }
     
@@ -124,34 +132,96 @@ public class VisualIndicators {
                 }
             });
         }
+    }
+    
+    void drawRangeIndicators() {
+        float pulseScale = settings.animateRanges ? 1f + Mathf.sin(animationTimer * 2f) * 0.05f : 1f;
         
+        for (RangeData range : rangeCache) {
+            float drawRange = range.isPulsing ? range.range * pulseScale : range.range;
+            
+            Draw.color(range.color, settings.rangeOpacity * 0.3f);
+            Fill.circle(range.x, range.y, drawRange);
+            
+            Draw.color(range.color, settings.rangeOpacity * 1.5f);
+            Lines.stroke(2f);
+            Lines.circle(range.x, range.y, drawRange);
+            
+            Draw.reset();
+        }
+    }
+    
+    void drawTurretVisionCones() {
         Groups.build.each(build -> {
             if (!build.isValid() || build.dead || build.health <= 0) return;
             if (build.team != Vars.player.team() && !settings.showTeamRanges) return;
             
             if (build.block instanceof Turret) {
                 Turret turret = (Turret)build.block;
-                Color color = build.team == Vars.player.team() ? Constants.RANGE_ATTACK : Color.valueOf("ff9999");
-                rangeCache.add(new RangeData(build.x, build.y, turret.range, color, true));
+                float rotation = build.rotation;
+                
+                boolean hasTarget = false;
+                boolean isFiring = false;
+                
+                if (build instanceof Turret.TurretBuild) {
+                    Turret.TurretBuild tb = (Turret.TurretBuild)build;
+                    hasTarget = tb.target != null;
+                    isFiring = tb.isShooting();
+                }
+                
+                Color coneColor;
+                float alpha;
+                
+                if (isFiring) {
+                    coneColor = Color.valueOf("ff4444");
+                    alpha = 0.4f + Mathf.absin(animationTimer * 5f, 0.2f);
+                } else if (hasTarget) {
+                    coneColor = Color.valueOf("ffaa44");
+                    alpha = 0.35f;
+                } else {
+                    coneColor = Color.valueOf("44ff44");
+                    alpha = 0.25f;
+                }
+                
+                drawVisionCone(build.x, build.y, rotation, turret.range, coneColor, alpha);
             }
         });
     }
     
-    void drawRangeIndicators() {
-        float pulseScale = settings.animateRanges ? 1f + arc.math.Mathf.sin(animationTimer * 2f) * 0.05f : 1f;
+    void drawVisionCone(float x, float y, float rotation, float range, Color color, float alpha) {
+        float halfAngle = VISION_CONE_ANGLE / 2f;
         
-        for (RangeData range : rangeCache) {
-            float drawRange = range.isPulsing ? range.range * pulseScale : range.range;
+        Draw.color(color, alpha * settings.rangeOpacity);
+        
+        Fill.tri(
+            x, y,
+            x + Mathf.cosDeg(rotation - halfAngle) * range,
+            y + Mathf.sinDeg(rotation - halfAngle) * range,
+            x + Mathf.cosDeg(rotation + halfAngle) * range,
+            y + Mathf.sinDeg(rotation + halfAngle) * range
+        );
+        
+        for (int i = 0; i < VISION_CONE_SEGMENTS; i++) {
+            float angle1 = rotation - halfAngle + (VISION_CONE_ANGLE * i / VISION_CONE_SEGMENTS);
+            float angle2 = rotation - halfAngle + (VISION_CONE_ANGLE * (i + 1) / VISION_CONE_SEGMENTS);
             
-            Draw.color(range.color, settings.rangeOpacity);
-            Fill.circle(range.x, range.y, drawRange);
-            
-            Draw.color(range.color, settings.rangeOpacity * 2f);
-            Lines.stroke(2f);
-            Lines.circle(range.x, range.y, drawRange);
-            
-            Draw.reset();
+            Fill.tri(
+                x, y,
+                x + Mathf.cosDeg(angle1) * range,
+                y + Mathf.sinDeg(angle1) * range,
+                x + Mathf.cosDeg(angle2) * range,
+                y + Mathf.sinDeg(angle2) * range
+            );
         }
+        
+        Draw.color(color, alpha * settings.rangeOpacity * 2f);
+        Lines.stroke(2f);
+        Lines.arc(x, y, range, VISION_CONE_ANGLE / 360f, rotation - halfAngle);
+        
+        Lines.line(x, y, x + Mathf.cosDeg(rotation - halfAngle) * range, y + Mathf.sinDeg(rotation - halfAngle) * range);
+        Lines.line(x, y, x + Mathf.cosDeg(rotation + halfAngle) * range, y + Mathf.sinDeg(rotation + halfAngle) * range);
+        
+        Draw.reset();
     }
     
     void drawEffectRanges() {
@@ -178,10 +248,14 @@ public class VisualIndicators {
             }
             
             if (effectColor != null && range > 0) {
-                Draw.color(effectColor, settings.effectRangeOpacity);
+                float pulseAlpha = settings.animateRanges ? 
+                    settings.effectRangeOpacity * (1f + Mathf.sin(animationTimer * 3f) * 0.3f) : 
+                    settings.effectRangeOpacity;
+                
+                Draw.color(effectColor, pulseAlpha);
                 Fill.circle(build.x, build.y, range);
                 
-                Draw.color(effectColor, settings.effectRangeOpacity * 2f);
+                Draw.color(effectColor, pulseAlpha * 2f);
                 Lines.stroke(1.5f);
                 Lines.dashCircle(build.x, build.y, range);
                 
