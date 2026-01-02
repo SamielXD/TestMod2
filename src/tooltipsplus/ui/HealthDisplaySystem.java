@@ -33,6 +33,7 @@ public class HealthDisplaySystem {
     private static final int MAX_BUILDINGS_PER_FRAME = 100;
     
     private int frameCounter = 0;
+    private Unit currentBoss = null;
 
     public HealthDisplaySystem(Settings settings) {
         this.settings = settings;
@@ -54,6 +55,10 @@ public class HealthDisplaySystem {
             updateDamageNumbers();
         }
         
+        if (settings.showBossBar && currentBoss != null && currentBoss.isValid()) {
+            drawBossBar();
+        }
+        
         if (frameCounter % 120 == 0) {
             cleanupHealthCache();
         }
@@ -62,15 +67,16 @@ public class HealthDisplaySystem {
     private void updateCameraBounds() {
         float margin = 100f;
         cameraBounds.set(
-            Vars.camera.position.x - Vars.camera.width / 2f - margin,
-            Vars.camera.position.y - Vars.camera.height / 2f - margin,
-            Vars.camera.width + margin * 2f,
-            Vars.camera.height + margin * 2f
+            arc.Core.camera.position.x - arc.Core.camera.width / 2f - margin,
+            arc.Core.camera.position.y - arc.Core.camera.height / 2f - margin,
+            arc.Core.camera.width + margin * 2f,
+            arc.Core.camera.height + margin * 2f
         );
     }
     
     private void drawUnits() {
         int drawn = 0;
+        currentBoss = null;
         
         for (Unit unit : Groups.unit) {
             if (drawn >= MAX_UNITS_PER_FRAME) break;
@@ -80,7 +86,17 @@ public class HealthDisplaySystem {
             if (!cameraBounds.contains(unit.x, unit.y)) continue;
             
             updateHealthCache(unit);
-            drawUnitHealth(unit);
+            
+            if (settings.showBossBar && unit.maxHealth >= settings.bossHPThreshold) {
+                if (currentBoss == null || unit.maxHealth > currentBoss.maxHealth) {
+                    currentBoss = unit;
+                }
+            }
+            
+            boolean shouldShow = !settings.autoHideFullHP || unit.health < unit.maxHealth;
+            if (shouldShow) {
+                drawUnitHealth(unit);
+            }
             
             if (settings.showStatusEffects) {
                 drawUnitStatus(unit);
@@ -101,7 +117,11 @@ public class HealthDisplaySystem {
             if (!cameraBounds.contains(build.x, build.y)) continue;
             
             updateHealthCache(build);
-            drawBuildingHealth(build);
+            
+            boolean shouldShow = !settings.autoHideFullHP || build.health < build.maxHealth;
+            if (shouldShow) {
+                drawBuildingHealth(build);
+            }
             
             drawn++;
         }
@@ -209,6 +229,14 @@ public class HealthDisplaySystem {
 
         float x = unit.x;
         float y = unit.y + unit.hitSize / 2f + 16f * settings.healthBarScale;
+        
+        if (settings.anchorMode.equals("fixed")) {
+            float screenX = arc.Core.camera.project(x, y).x;
+            float screenY = arc.Core.camera.project(x, y).y;
+            x = screenX;
+            y = screenY;
+        }
+        
         float width = Math.max(45f, unit.hitSize * 1.2f) * settings.healthBarScale;
 
         Color barColor = getTeamColor(unit.team);
@@ -276,6 +304,55 @@ public class HealthDisplaySystem {
 
         Color barColor = getTeamColor(build.team);
         drawHealthBar(x, y, cache.displayHealth, build.maxHealth, 0f, width, barColor);
+    }
+    
+    void drawBossBar() {
+        if (currentBoss == null || !currentBoss.isValid()) return;
+        
+        int id = currentBoss.id();
+        HealthCache cache = healthCache.get(id);
+        if (cache == null) return;
+        
+        float screenWidth = arc.Core.graphics.getWidth();
+        float x = screenWidth / 2f;
+        float y = arc.Core.graphics.getHeight() - 60f;
+        float width = 400f;
+        float height = 18f;
+        
+        float healthPercent = Mathf.clamp(cache.displayHealth / currentBoss.maxHealth);
+        
+        Draw.color(0, 0, 0, 0.8f);
+        Fill.rect(x, y, width + 6f, height + 6f);
+        
+        Draw.color(0.2f, 0.2f, 0.2f, 0.9f);
+        Fill.rect(x, y, width, height);
+        
+        float fillWidth = width * healthPercent;
+        Color bossColor = Color.valueOf("ff4444");
+        
+        Draw.color(bossColor.r * 0.5f, bossColor.g * 0.5f, bossColor.b * 0.5f, 0.9f);
+        Fill.rect(x - width/2f + fillWidth/2f, y, fillWidth, height);
+        
+        Draw.color(bossColor, 1f);
+        Fill.rect(x - width/2f + fillWidth/2f, y, fillWidth, height * 0.6f);
+        
+        float pulse = Mathf.absin(Time.time / 30f, 0.3f);
+        Draw.color(Color.white, 0.4f + pulse);
+        Fill.rect(x - width/2f + fillWidth/2f, y + height/2f - 2f, fillWidth, 3f);
+        
+        String bossName = currentBoss.type != null ? currentBoss.type.localizedName : "BOSS";
+        Fonts.outline.getData().setScale(0.8f);
+        Fonts.outline.setColor(Color.white);
+        layout.setText(Fonts.outline, bossName);
+        Fonts.outline.draw(bossName, x - layout.width/2f, y + height/2f + 30f);
+        
+        String healthText = (int)cache.displayHealth + " / " + (int)currentBoss.maxHealth;
+        Fonts.outline.getData().setScale(0.6f);
+        layout.setText(Fonts.outline, healthText);
+        Fonts.outline.draw(healthText, x - layout.width/2f, y + 4f);
+        
+        Fonts.outline.getData().setScale(1f);
+        Draw.reset();
     }
 
     Color getTeamColor(Team team) {
