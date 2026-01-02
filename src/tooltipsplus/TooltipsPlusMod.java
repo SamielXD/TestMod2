@@ -17,6 +17,7 @@ public class TooltipsPlusMod extends Mod {
     private ColorUtil colors;
     private TooltipRenderer tooltipRenderer;
     private VisualIndicators visualIndicators;
+    private HealthDisplaySystem healthDisplay;
     private SettingsUI settingsUI;
     
     public TooltipsPlusMod() {
@@ -28,14 +29,16 @@ public class TooltipsPlusMod extends Mod {
 
     @Override
     public void init() {
-        Log.info("TooltipsPlus v4.0 initializing...");
+        Log.info("TooltipsPlus v5.0 initializing...");
         
         if (settings.enabled) {
             tooltipRenderer = new TooltipRenderer(settings, colors);
             visualIndicators = new VisualIndicators(settings);
+            healthDisplay = new HealthDisplaySystem(settings);
             
             setupTooltipSystem();
             setupVisualIndicators();
+            setupHealthDisplay();
             setupHotkeys();
             injectStaticDescriptions();
         }
@@ -43,7 +46,7 @@ public class TooltipsPlusMod extends Mod {
         settingsUI = new SettingsUI(settings, colors);
         settingsUI.build();
         
-        Log.info("TooltipsPlus loaded with visual indicators");
+        Log.info("TooltipsPlus loaded with Helium-style health bars");
     }
     
     void setupTooltipSystem() {
@@ -59,6 +62,15 @@ public class TooltipsPlusMod extends Mod {
             if (!settings.enabled || Vars.state.isMenu()) return;
             if (visualIndicators != null) {
                 visualIndicators.update();
+            }
+        });
+    }
+    
+    void setupHealthDisplay() {
+        Events.run(EventType.Trigger.draw, () -> {
+            if (!settings.enabled || Vars.state.isMenu()) return;
+            if (healthDisplay != null) {
+                healthDisplay.draw();
             }
         });
     }
