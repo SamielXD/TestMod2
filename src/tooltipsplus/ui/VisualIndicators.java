@@ -98,13 +98,14 @@ public class VisualIndicators {
             
             if (build.block instanceof Turret) {
                 Turret turret = (Turret)build.block;
-                float rotation = build.rotation;
                 
+                float rotation = 0f;
                 boolean hasTarget = false;
                 boolean isFiring = false;
                 
                 if (build instanceof Turret.TurretBuild) {
                     Turret.TurretBuild tb = (Turret.TurretBuild)build;
+                    rotation = tb.rotation;
                     hasTarget = tb.target != null;
                     isFiring = tb.isShooting();
                 }
@@ -114,13 +115,13 @@ public class VisualIndicators {
                 
                 if (isFiring) {
                     coneColor = Color.valueOf("ff4444");
-                    alpha = 0.4f + Mathf.absin(animationTimer * 5f, 0.2f);
+                    alpha = 0.45f + Mathf.absin(animationTimer * 6f, 0.25f);
                 } else if (hasTarget) {
                     coneColor = Color.valueOf("ffaa44");
-                    alpha = 0.35f;
+                    alpha = 0.38f + Mathf.absin(animationTimer * 3f, 0.12f);
                 } else {
                     coneColor = Color.valueOf("44ff44");
-                    alpha = 0.25f;
+                    alpha = 0.28f;
                 }
                 
                 drawVisionCone(build.x, build.y, rotation, turret.range, coneColor, alpha);
