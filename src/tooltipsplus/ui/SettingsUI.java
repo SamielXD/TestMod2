@@ -94,13 +94,28 @@ public class SettingsUI {
             settings.save();
         }).colspan(2).left().row();
         
+        t.check("Show All Damage Numbers", settings.showAllDamageNumbers, v -> {
+            settings.showAllDamageNumbers = v;
+            settings.save();
+        }).colspan(2).left().row();
+        
+        t.add("[lightgray](OFF = Only your team's damage)").colspan(2).left().padTop(-4f).row();
+        
         t.add("Health Bar Size: ").left();
-        t.slider(50, 200, 10, (int)(settings.healthBarScale * 100), v -> {
+        t.slider(50, 150, 10, (int)(settings.healthBarScale * 100), v -> {
             settings.healthBarScale = v / 100f;
             settings.save();
         }).width(200f).row();
         
         t.add("[lightgray](" + (int)(settings.healthBarScale * 100) + "%)").colspan(2).left().padTop(-4f).row();
+        
+        t.add("Damage Number Size: ").left();
+        t.slider(30, 150, 10, (int)(settings.damageNumberScale * 100), v -> {
+            settings.damageNumberScale = v / 100f;
+            settings.save();
+        }).width(200f).row();
+        
+        t.add("[lightgray](" + (int)(settings.damageNumberScale * 100) + "%)").colspan(2).left().padTop(-4f).row();
         
         t.add("Range Opacity: ").left();
         t.slider(0, 100, 5, (int)(settings.rangeOpacity * 100), v -> {
