@@ -89,6 +89,11 @@ public class SettingsUI {
             settings.save();
         }).colspan(2).left().row();
         
+        t.check("Status Effects Display", settings.showStatusEffects, v -> {
+            settings.showStatusEffects = v;
+            settings.save();
+        }).colspan(2).left().row();
+        
         t.add("Health Bar Size: ").left();
         t.slider(50, 200, 10, (int)(settings.healthBarScale * 100), v -> {
             settings.healthBarScale = v / 100f;
