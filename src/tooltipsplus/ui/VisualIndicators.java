@@ -50,28 +50,6 @@ public class VisualIndicators {
         
         rangeCacheTimer = 0f;
         rangeCache.clear();
-        
-        if (settings.showUnitRanges) {
-            Groups.unit.each(unit -> {
-                if (!unit.isValid() || unit.dead || unit.health <= 0 || unit.type.weapons.size == 0) return;
-                if (unit.team != Vars.player.team() && !settings.showTeamRanges) return;
-                
-                float maxRange = 0f;
-                for (var weapon : unit.type.weapons) {
-                    if (weapon.bullet != null) {
-                        float weaponRange = weapon.bullet.rangeChange + weapon.bullet.speed * weapon.bullet.lifetime;
-                        if (weaponRange > maxRange) {
-                            maxRange = weaponRange;
-                        }
-                    }
-                }
-                
-                if (maxRange > 0) {
-                    Color color = unit.team == Vars.player.team() ? Constants.RANGE_ATTACK : Color.valueOf("ff9999");
-                    rangeCache.add(new RangeData(unit.x, unit.y, maxRange, color, true));
-                }
-            });
-        }
     }
     
     void drawRangeIndicators() {
